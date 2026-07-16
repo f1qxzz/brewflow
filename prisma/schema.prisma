@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  name      String
+  slug      String     @unique
+  order     Int        @default(0)
+  items     MenuItem[]
+  createdAt DateTime   @default(now())
+}
+
+model MenuItem {
+  id          Int         @id @default(autoincrement())
+  name        String
+  description String      @default("")
+  price       Float
+  image       String      @default("")
+  categoryId  Int
+  category    Category    @relation(fields: [categoryId], references: [id])
+  available   Boolean     @default(true)
+  order       Int         @default(0)
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  customerName    String      @default("")
+  tableNumber     String      @default("")
+  phone           String      @default("")
+  status          String      @default("pending")
+  total           Float       @default(0)
+  paymentMethod   String      @default("cash")
+  paymentStatus   String      @default("unpaid")
+  paymentTrxId    String      @default("")
+  paidAt          DateTime?
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  order      Order    @relation(fields: [orderId], references: [id])
+  menuItemId Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  quantity   Int      @default(1)
+  price      Float
+}
+
+model Feedback {
+  id           Int      @id @default(autoincrement())
+  customerName String   @default("")
+  rating       Int
+  message      String   @default("")
+  createdAt    DateTime @default(now())
+}

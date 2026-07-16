@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" rx="40" fill="#3C1F0E"/>
+  <text x="200" y="170" text-anchor="middle" font-size="80" fill="#D4A574">☕</text>
+  <text x="200" y="280" text-anchor="middle" font-size="24" fill="#D4A574" font-family="system-ui,sans-serif" font-weight="bold">Long Black</text>
+  <text x="200" y="320" text-anchor="middle" font-size="18" fill="#D4A57480" font-family="system-ui,sans-serif">Rp22.000</text>
+</svg>
