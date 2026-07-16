@@ -159,20 +159,6 @@ Full design spec: [`docs/DESIGN.md`](./docs/DESIGN.md)
 
 ---
 
-## 💼 Monetization
-
-Cocok dijual ke cafe owner:
-
-| Paket | Harga | Apa yang dapet |
-|---|---|---|
-| **Setup** (one-time) | Rp 500k–1jt | QR menu + admin dashboard |
-| **Monthly** | Rp 100–200k | Hosting + update menu konten |
-| **Bundle** | Rp 2jt | QR menu + feedback + antrian digital |
-
-Setup gampang: fork → deploy → kasih akses admin ke owner → tempel QR di meja.
-
----
-
 ## 🤝 Contributing
 
 PRs welcome! Areas to help:
