@@ -8,8 +8,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+      "start": "next start",
+      "test": "node --import tsx --test \"tests/*.test.ts\"",
+      "lint": "eslint"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

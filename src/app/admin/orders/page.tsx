@@ -24,20 +24,62 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   qris: "QRIS", va_bca: "BCA VA", va_mandiri: "Mandiri VA", va_bni: "BNI VA", gopay: "GoPay", cash: "Tunai",
 };
 
+const beep = (() => {
+  let ac: AudioContext | null = null;
+  return () => {
+    try {
+      ac ||= new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (ac.state === "suspended") ac.resume();
+      const t = ac.currentTime;
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.connect(g);
+      g.connect(ac.destination);
+      o.type = "sine";
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      o.frequency.setValueAtTime(880, t);
+      o.frequency.setValueAtTime(1318, t + 0.2);
+      o.start(t);
+      o.stop(t + 0.5);
+    } catch {}
+  };
+})();
+
 export default function OrdersPage() {
   const token = useAdminToken();
   const [orders, setOrders] = useState<any[]>([]);
+  const [flash, setFlash] = useState(false);
 
   useEffect(() => {
-    fetch("/api/orders", { headers: { "x-admin-token": token } })
-      .then((r) => r.json())
-      .then((data) => { if (!data.error) setOrders(data); });
-    const interval = setInterval(() => {
+    let alive = true;
+    let first = true;
+    const known = new Set<number>();
+
+    const load = () =>
       fetch("/api/orders", { headers: { "x-admin-token": token } })
         .then((r) => r.json())
-        .then((data) => { if (!data.error) setOrders(data); });
-    }, 6000);
-    return () => clearInterval(interval);
+        .then((data) => {
+          if (!alive || data.error) return;
+          const ids = new Set<number>(data.map((o: any) => o.id));
+          if (!first && [...ids].some((id) => !known.has(id))) {
+            beep(); // pesanan baru masuk = bunyi + flash header
+            setFlash(true);
+            setTimeout(() => alive && setFlash(false), 1600);
+          }
+          first = false;
+          ids.forEach((id) => known.add(id));
+          setOrders(data);
+        })
+        .catch(() => {});
+
+    load();
+    const interval = setInterval(load, 6000);
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
   }, [token]);
 
   async function updateStatus(id: number, status: string) {
@@ -72,7 +114,7 @@ export default function OrdersPage() {
   return (
     <div className="min-h-dvh bg-cream-50">
       <div className="relative z-10">
-        <header className="sticky top-0 z-30 bg-white border-b border-cream-200">
+        <header className={`sticky top-0 z-30 border-b transition-colors duration-300 ${flash ? "bg-coffee-500 border-coffee-600" : "bg-white border-cream-200"}`}>
           <div className="max-w-7xl mx-auto px-4 md:px-8 h-14 flex items-center gap-3">
             <Link href="/admin" className="w-8 h-8 rounded-full bg-cream-100 border border-cream-200 flex items-center justify-center hover:bg-cream-200 transition-colors">
               <ArrowLeft className="w-4 h-4 text-coffee-800/70" />
