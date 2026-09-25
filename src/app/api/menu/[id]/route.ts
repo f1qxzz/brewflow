@@ -1,15 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin, parseId } from "@/lib/admin-auth";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = requireAdmin(req);
   if (auth) return auth;
 
   const { id } = await params;
+  const numId = parseId(id);
+  if (!numId) return NextResponse.json({ error: "ID tidak valid" }, { status: 400 });
   const body = await req.json();
   const item = await prisma.menuItem.update({
-    where: { id: Number(id) },
+    where: { id: numId },
     data: {
       name: body.name,
       description: body.description,
@@ -28,7 +30,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (auth) return auth;
 
   const { id } = await params;
-  const numericId = Number(id);
+  const numericId = parseId(id);
+  if (!numericId) return NextResponse.json({ error: "ID tidak valid" }, { status: 400 });
   await prisma.orderItem.deleteMany({ where: { menuItemId: numericId } });
   await prisma.menuItem.delete({ where: { id: numericId } });
   return NextResponse.json({ ok: true });

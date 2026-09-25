@@ -1,19 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { parseId } from "@/lib/admin-auth";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
+  const numId = parseId(orderId);
+  if (!numId) return NextResponse.json({ error: "ID tidak valid" }, { status: 400 });
   const order = await prisma.order.findUnique({
-    where: { id: Number(orderId) },
+    where: { id: numId },
     select: {
       id: true,
       status: true,
       paymentMethod: true,
       paymentStatus: true,
-      paymentTrxId: true,
       paidAt: true,
       total: true,
-      tableNumber: true,
     },
   });
   if (!order) return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });

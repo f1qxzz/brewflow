@@ -1,41 +1,66 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin, rateLimitKey, clientKey, parseId } from "@/lib/admin-auth";
+import { signed } from "@/lib/sign";
+
+const VALID_METHODS = ["cash", "qris", "va_bca", "va_mandiri", "va_bni", "gopay"] as const;
 
 export async function POST(req: Request) {
-  const { customerName, tableNumber, phone, items, paymentMethod } = await req.json();
-  if (!items?.length) return NextResponse.json({ error: "Pilih minimal 1 item" }, { status: 400 });
+  const rl = rateLimitKey("ord:" + clientKey(req), 20, 60_000);
+  if (rl) return rl;
 
-  const validMethods = ["cash", "qris", "va_bca", "va_mandiri", "va_bni", "gopay"];
-  const method = validMethods.includes(paymentMethod) ? paymentMethod : "cash";
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  const { customerName, tableNumber, phone, items, paymentMethod } = body;
+  if (!Array.isArray(items) || !items.length) {
+    return NextResponse.json({ error: "Pilih minimal 1 item" }, { status: 400 });
+  }
+  if (items.length > 50) {
+    return NextResponse.json({ error: "Terlalu banyak item" }, { status: 400 });
+  }
+
+  const method = (VALID_METHODS as readonly string[]).includes(paymentMethod) ? paymentMethod : "cash";
+  const name = String(customerName || "").trim().slice(0, 100);
+  const table = String(tableNumber || "").trim().slice(0, 10);
+  let phoneStr = String(phone || "").replace(/[^\d+]/g, "").slice(0, 20);
+  if (phoneStr && !/^\+?\d{8,15}$/.test(phoneStr)) phoneStr = "";
 
   let total = 0;
   const orderItems = [];
   for (const item of items) {
-    const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
-    const menuItem = await prisma.menuItem.findUnique({ where: { id: item.id } });
+    const id = Number(item?.id);
+    const qty = Math.min(99, Math.max(1, Math.floor(Number(item?.quantity) || 1)));
+    if (!id) continue;
+    const menuItem = await prisma.menuItem.findUnique({ where: { id } });
     if (!menuItem || !menuItem.available) continue;
-    const price = menuItem.price;
-    total += price * qty;
-    orderItems.push({ menuItemId: item.id, quantity: qty, price });
+    total += menuItem.price * qty;
+    orderItems.push({ menuItemId: id, quantity: qty, price: menuItem.price });
   }
 
-  if (!orderItems.length) return NextResponse.json({ error: "Item tidak tersedia" }, { status: 400 });
+  if (!orderItems.length) {
+    return NextResponse.json({ error: "Item tidak tersedia" }, { status: 400 });
+  }
 
   const order = await prisma.order.create({
     data: {
-      customerName: String(customerName || "").slice(0, 100),
-      tableNumber: String(tableNumber || "").slice(0, 10),
-      phone,
+      customerName: name,
+      tableNumber: table,
+      phone: phoneStr,
       total,
       paymentMethod: method,
-      paymentStatus: method === "cash" ? "unpaid" : "unpaid",
+      paymentStatus: "unpaid",
       items: { create: orderItems },
     },
     include: { items: { include: { menuItem: true } } },
   });
 
-  return NextResponse.json(order);
+  // orderToken = bukti order ini milik pembuatnya — wajib ditempel di POST /api/payment/create
+  return NextResponse.json({ ...order, orderToken: signed(order.id) });
 }
 
 export async function GET(req: Request) {
@@ -43,12 +68,22 @@ export async function GET(req: Request) {
   const table = url.searchParams.get("table");
 
   if (table) {
+    const rl = rateLimitKey("tbl:" + clientKey(req), 60, 60_000);
+    if (rl) return rl;
+
     const orders = await prisma.order.findMany({
       where: {
         tableNumber: table,
         status: { in: ["pending", "processed"] },
       },
-      include: { items: { include: { menuItem: true } } },
+      select: {
+        id: true,
+        status: true,
+        total: true,
+        tableNumber: true,
+        createdAt: true,
+        items: { select: { quantity: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(orders);
@@ -69,14 +104,15 @@ export async function PATCH(req: Request) {
   if (auth) return auth;
 
   const { id, status } = await req.json();
+  const numId = parseId(String(id ?? ""));
   const valid = ["pending", "processed", "done", "cancelled"];
-  if (!valid.includes(status)) {
+  if (!numId || !valid.includes(status)) {
     return NextResponse.json({ error: "Status invalid" }, { status: 400 });
   }
-  const existing = await prisma.order.findUnique({ where: { id } });
+  const existing = await prisma.order.findUnique({ where: { id: numId } });
   if (!existing) return NextResponse.json({ error: "Pesanan tidak ditemukan" }, { status: 404 });
   const order = await prisma.order.update({
-    where: { id },
+    where: { id: numId },
     data: { status },
   });
   return NextResponse.json(order);

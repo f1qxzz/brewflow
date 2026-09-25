@@ -6,9 +6,9 @@ import Link from "next/link";
 import { CheckCircle2, Clock, Coffee, CookingPot, RotateCcw, Send, Star } from "lucide-react";
 
 const statusSteps = [
-  { key: "pending",   label: "Menunggu",         icon: Clock,        color: "text-amber-400" },
-  { key: "processed", label: "Diproses",          icon: CookingPot,   color: "text-blue-400" },
-  { key: "done",      label: "Selesai",           icon: CheckCircle2, color: "text-emerald-400" },
+  { key: "pending",   label: "Menunggu",         icon: Clock,        color: "text-amber-600" },
+  { key: "processed", label: "Diproses",          icon: CookingPot,   color: "text-blue-600" },
+  { key: "done",      label: "Selesai",           icon: CheckCircle2, color: "text-emerald-600" },
 ];
 
 const statusOrder = ["pending", "processed", "done"];
@@ -54,12 +54,9 @@ export default function OrderConfirm({
         transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
         className="flex justify-center mb-6"
       >
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-500/20">
+        <div className="w-14 h-14 rounded-full bg-emerald-600 flex items-center justify-center">
           <motion.svg
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 0.5, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="w-10 h-10 text-white"
+            className="w-7 h-7 text-white"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth={3}
@@ -67,7 +64,8 @@ export default function OrderConfirm({
             <motion.path
               initial={{ pathLength: 0 }}
               animate={{ pathLength: 1 }}
-              transition={{ duration: 0.4, delay: 0.4, ease: "easeOut" }}
+              transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
+              stroke="currentColor"
               strokeLinecap="round"
               strokeLinejoin="round"
               d="M4.5 12.75l6 6 9-13.5"
@@ -83,14 +81,14 @@ export default function OrderConfirm({
         transition={{ delay: 0.3 }}
         className="text-center mb-6"
       >
-        <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h2 className="text-2xl font-bold text-coffee-950" style={{ fontFamily: "var(--font-display)" }}>
           {isPaid
             ? `Pesanan #${orderId} Lunas!`
             : !isCash && livePaymentStatus === "unpaid"
             ? `Pesanan #${orderId} — Pending`
             : `Pesanan #${orderId} Diterima!`}
         </h2>
-        <p className="text-white/50 mt-1 text-sm">
+        <p className="text-coffee-800/65 mt-1 text-sm">
           {isPaid
             ? "Pembayaran lunas! Tim kami proses secepatnya"
             : !isCash && livePaymentStatus === "unpaid"
@@ -105,10 +103,10 @@ export default function OrderConfirm({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.32 }}
-          className={`flex items-center justify-center gap-2 mb-4 px-4 py-2 rounded-xl text-sm font-medium border ${
+          className={`flex items-center justify-center gap-2 mb-4 px-4 py-2 rounded-none text-sm font-medium border ${
             isPaid
-              ? "bg-emerald-500/15 border-emerald-400/30 text-emerald-300"
-              : "bg-amber-500/15 border-amber-400/30 text-amber-300"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-amber-50 border-amber-200 text-amber-800"
           }`}
         >
           {isPaid ? (
@@ -131,7 +129,7 @@ export default function OrderConfirm({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
-          className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5 mb-4"
+          className="rounded-none bg-white border border-cream-200 p-5 mb-4"
         >
           <div className="flex items-center justify-between">
             {statusSteps.map((step, i) => {
@@ -141,21 +139,21 @@ export default function OrderConfirm({
                 <div key={step.key} className="flex items-center gap-0 flex-1">
                   <div className="flex flex-col items-center">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 ${
-                      done ? "bg-emerald-500/20" : "bg-white/[0.04]"
+                      done ? "bg-emerald-100" : "bg-cream-100"
                     }`}>
                       <Icon className={`w-5 h-5 transition-all duration-500 ${
-                        done ? "text-emerald-400" : "text-white/20"
+                        done ? "text-emerald-600" : "text-coffee-800/35"
                       }`} />
                     </div>
                     <p className={`text-[10px] font-medium mt-1.5 transition-all duration-500 ${
-                      done ? "text-emerald-400" : "text-white/20"
+                      done ? "text-emerald-700" : "text-coffee-800/40"
                     }`}>
                       {step.label}
                     </p>
                   </div>
                   {i < statusSteps.length - 1 && (
                     <div className={`flex-1 h-px mx-2 mb-5 transition-all duration-700 ${
-                      i < orderStatusIdx ? "bg-emerald-400/50" : "bg-white/[0.06]"
+                      i < orderStatusIdx ? "bg-emerald-400" : "bg-cream-200"
                     }`} />
                   )}
                 </div>
@@ -171,14 +169,14 @@ export default function OrderConfirm({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
-          className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5 mb-4"
+          className="rounded-none bg-white border border-cream-200 p-5 mb-4"
         >
-          <p className="text-sm text-white/60 text-center">
+          <p className="text-sm text-coffee-800/70 text-center">
             Selesaikan pembayaran via {PAYMENT_METHOD_LABELS[order?.paymentMethod] || "metode yang dipilih"} untuk pesanan diproses.
           </p>
           <Link
-            href={`/payment/${orderId}`}
-            className="mt-3 flex items-center justify-center gap-2 w-full py-2.5 bg-emerald-500 text-white rounded-xl font-medium text-sm hover:bg-emerald-400 transition-colors"
+            href={`/payment/${orderId}?t=${encodeURIComponent(order?.orderToken || "")}`}
+            className="mt-3 flex items-center justify-center gap-2 w-full py-2.5 bg-coffee-500 text-white rounded-none font-medium text-sm hover:bg-coffee-600 transition-colors"
           >
             Lihat Detail Pembayaran →
           </Link>
@@ -190,12 +188,12 @@ export default function OrderConfirm({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="rounded-2xl bg-white/[0.03] border border-white/[0.06] overflow-hidden"
+        className="rounded-none bg-white border border-cream-200 overflow-hidden"
       >
-        <div className="px-5 pt-4 pb-3 border-b border-dashed border-white/[0.06]">
+        <div className="px-5 pt-4 pb-3 border-b border-dashed border-cream-200">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-coffee-300 uppercase tracking-wider">Brew & Co.</span>
-            <span className="text-[10px] text-white/40 font-mono">#{orderId}</span>
+            <span className="text-xs font-medium text-coffee-500 uppercase tracking-wider">Brew & Co.</span>
+            <span className="text-[10px] text-coffee-800/55 font-mono">#{orderId}</span>
           </div>
         </div>
 
@@ -209,12 +207,12 @@ export default function OrderConfirm({
               className="flex items-center justify-between text-sm"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <Coffee className="w-3.5 h-3.5 text-coffee-400 shrink-0" />
-                <span className="font-medium text-white/80 truncate">{i.name}</span>
+                <Coffee className="w-3.5 h-3.5 text-coffee-500 shrink-0" />
+                <span className="font-medium text-coffee-950 truncate">{i.name}</span>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <span className="text-white/40 text-xs">{i.qty}x</span>
-                <span className="font-mono text-sm font-semibold text-coffee-300" style={{ fontFamily: "var(--font-mono)" }}>
+                <span className="text-coffee-800/55 text-xs">{i.qty}x</span>
+                <span className="font-mono text-sm font-semibold text-coffee-950">
                   Rp{(i.price * i.qty).toLocaleString()}
                 </span>
               </div>
@@ -222,9 +220,9 @@ export default function OrderConfirm({
           ))}
         </div>
 
-        <div className="px-5 py-3 border-t border-dashed border-white/[0.06] flex items-center justify-between">
-          <span className="font-semibold text-white">Total</span>
-          <span className="font-mono font-bold text-white text-lg" style={{ fontFamily: "var(--font-mono)" }}>
+        <div className="px-5 py-3 border-t border-dashed border-cream-200 flex items-center justify-between">
+          <span className="font-semibold text-coffee-950">Total</span>
+          <span className="font-mono font-bold text-coffee-950 text-lg">
             Rp{order?.items?.reduce((s: number, i: any) => s + i.price * i.qty, 0).toLocaleString()}
           </span>
         </div>
@@ -235,10 +233,10 @@ export default function OrderConfirm({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.7 }}
-        className="mt-8 bg-white/[0.03] rounded-2xl border border-white/[0.06] p-5"
+        className="mt-8 bg-white rounded-none border border-cream-200 p-5"
       >
-        <h3 className="font-semibold text-white mb-1">Kasih Rating & Feedback</h3>
-        <p className="text-xs text-white/40 mb-4">Bantu kami terus improve pelayanan</p>
+        <h3 className="font-semibold text-coffee-950 mb-1">Kasih Rating & Feedback</h3>
+        <p className="text-xs text-coffee-800/55 mb-4">Bantu kami terus improve pelayanan</p>
 
         <div className="flex justify-center gap-1.5 mb-4">
           {[1, 2, 3, 4, 5].map((n) => (
@@ -246,10 +244,10 @@ export default function OrderConfirm({
               key={n}
               onClick={() => onRatingChange(n)}
               whileTap={{ scale: 0.8 }}
-              className={`p-1 transition-all duration-150 ${n <= rating ? "scale-100" : "scale-90 opacity-30"}`}
+              className={`p-1 transition-all duration-150 ${n <= rating ? "scale-100" : "scale-90 opacity-40"}`}
               aria-label={`${n} bintang`}
             >
-              <Star className={`w-7 h-7 ${n <= rating ? "fill-coffee-300 text-coffee-300" : "text-white/[0.12]"}`} />
+              <Star className={`w-7 h-7 ${n <= rating ? "fill-coffee-300 text-coffee-500" : "text-cream-300"}`} />
             </motion.button>
           ))}
         </div>
@@ -259,20 +257,20 @@ export default function OrderConfirm({
           onChange={(e) => onFeedbackChange(e.target.value)}
           placeholder="Tulis pesan kamu di sini..."
           rows={2}
-          className="w-full px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.04] text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-coffee-500/40 focus:border-coffee-500/40 transition-all resize-none mb-3"
+          className="w-full px-4 py-3 rounded-none border border-cream-200 bg-white text-sm text-coffee-950 placeholder:text-coffee-800/40 focus:outline-none focus:ring-2 focus:ring-coffee-500/40 focus:border-coffee-500 transition-all resize-none mb-3"
         />
 
         <div className="flex gap-3">
           <button
             onClick={onOrderAgain}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 border border-white/[0.08] text-white/60 rounded-xl font-medium hover:bg-white/[0.06] active:scale-95 transition-all duration-200 flex-1"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 border border-cream-200 bg-white text-coffee-800 rounded-none font-medium hover:bg-cream-100 active:scale-95 transition-all duration-200 flex-1"
           >
             <RotateCcw className="w-4 h-4" />
             Pesan Lagi
           </button>
           <button
             onClick={onSubmitFeedback}
-            className="flex items-center justify-center gap-2 py-2.5 px-5 bg-coffee-500 text-white rounded-xl font-medium hover:bg-coffee-400 active:scale-95 transition-all duration-200 flex-1"
+            className="flex items-center justify-center gap-2 py-2.5 px-5 bg-coffee-500 text-white rounded-none font-medium hover:bg-coffee-600 active:scale-95 transition-all duration-200 flex-1"
           >
             <Send className="w-4 h-4" />
             Kirim

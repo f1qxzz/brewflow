@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { CheckCircle2, Clock, Copy, ExternalLink, ArrowLeft, QrCode, Building2, Wallet, Lock } from "lucide-react";
@@ -22,6 +22,17 @@ export default function PaymentPage() {
   const orderId = Number(params.orderId);
   const isFinish = searchParams.get("status") === "finish";
 
+  // token dari URL (?t=) — fallback: pendingOrder di localStorage (reload/bookmark lintas tab)
+  function tokenFor(id: number): string {
+    const fromUrl = searchParams.get("t");
+    if (fromUrl) return fromUrl;
+    try {
+      const saved = JSON.parse(localStorage.getItem("brewflow:pendingOrder") || "{}");
+      if (saved.orderToken && saved.id === id) return String(saved.orderToken);
+    } catch {}
+    return "";
+  }
+
   const [order, setOrder] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
   const [snapUrl, setSnapUrl] = useState<string>("");
@@ -33,6 +44,18 @@ export default function PaymentPage() {
   const [error, setError] = useState("");
   const [paid, setPaid] = useState(false);
   const [redirecting, setRedirecting] = useState(true);
+  const navigating = useRef(false);
+
+  useEffect(() => {
+    if (paid || loading || error) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      if (navigating.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [paid, loading, error]);
 
   useEffect(() => {
     if (!orderId) return;
@@ -50,7 +73,7 @@ export default function PaymentPage() {
         const sessionRes = await fetch("/api/payment/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId, method: orderData.paymentMethod }),
+          body: JSON.stringify({ orderId, method: orderData.paymentMethod, orderToken: tokenFor(orderId) }),
         });
         if (!sessionRes.ok) {
           const err = await sessionRes.json();
@@ -65,7 +88,7 @@ export default function PaymentPage() {
           setSession(sessionData.session);
           if (sessionData.session.qrString) {
             const url = await QRCode.toDataURL(sessionData.session.qrString, {
-              margin: 2, width: 400, color: { dark: "#D4A574", light: "#1C1917" },
+              margin: 2, width: 400, color: { dark: "#0A0A0A", light: "#FFFFFF" },
             });
             setQrDataUrl(url);
           }
@@ -81,7 +104,7 @@ export default function PaymentPage() {
   useEffect(() => {
     if (snapUrl && !isFinish && !paid) {
       setRedirecting(true);
-      const timer = setTimeout(() => { window.location.href = snapUrl; }, 1500);
+      const timer = setTimeout(() => { navigating.current = true; window.location.href = snapUrl; }, 1500);
       return () => clearTimeout(timer);
     }
   }, [snapUrl, isFinish, paid]);
@@ -112,18 +135,21 @@ export default function PaymentPage() {
   }, []);
 
   function handlePayNow() {
-    if (snapUrl) window.location.href = snapUrl;
+    if (snapUrl) {
+      navigating.current = true;
+      window.location.href = snapUrl;
+    }
   }
 
   if (loading) {
     return (
-      <div className="min-h-dvh bg-[#0C0A09] flex items-center justify-center">
+      <div className="min-h-dvh bg-cream-50 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="relative mx-auto w-12 h-12">
-            <div className="absolute inset-0 rounded-full border-2 border-white/[0.06]" />
+            <div className="absolute inset-0 rounded-full border-2 border-cream-200" />
             <div className="absolute inset-0 rounded-full border-2 border-coffee-500 border-t-transparent animate-spin" />
           </div>
-          <p className="text-white/40 text-sm">Menyiapkan pembayaran...</p>
+          <p className="text-coffee-800/60 text-sm">Menyiapkan pembayaran...</p>
         </div>
       </div>
     );
@@ -131,16 +157,16 @@ export default function PaymentPage() {
 
   if (error) {
     return (
-      <div className="min-h-dvh bg-[#0C0A09] flex items-center justify-center">
+      <div className="min-h-dvh bg-cream-50 flex items-center justify-center">
         <div className="text-center max-w-sm mx-auto px-4">
-          <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-white/[0.04] flex items-center justify-center">
-            <Clock className="w-6 h-6 text-white/30" />
+          <div className="w-14 h-14 mx-auto mb-4 rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center">
+            <Clock className="w-6 h-6 text-coffee-800/50" />
           </div>
-          <h2 className="text-lg font-bold text-white mb-1">Oops!</h2>
-          <p className="text-sm text-white/50 mb-6">{error}</p>
+          <h2 className="text-lg font-bold text-coffee-950 mb-1">Oops!</h2>
+          <p className="text-sm text-coffee-800/65 mb-6">{error}</p>
           <button
             onClick={() => router.push("/menu")}
-            className="px-5 py-2.5 bg-white/[0.08] text-white/70 rounded-lg text-sm font-medium hover:bg-white/[0.12] transition-all"
+            className="px-5 py-2.5 bg-cream-100 border border-cream-200 text-coffee-950 rounded-none text-sm font-medium hover:bg-cream-200 transition-all"
           >
             Kembali ke Menu
           </button>
@@ -156,13 +182,16 @@ export default function PaymentPage() {
   const isCash = method === "cash";
 
   return (
-    <div className="min-h-dvh bg-[#0C0A09]">
+    <div className="min-h-dvh bg-cream-50">
       <div className="max-w-lg mx-auto px-4 pt-5 pb-12">
         <motion.button
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
-          onClick={() => router.push("/menu")}
-          className="flex items-center gap-2 text-sm text-white/40 hover:text-white/60 transition-colors mb-5"
+          onClick={() => {
+            if (!paid && !window.confirm("Pembayaran belum selesai. Tinggalkan halaman pembayaran?")) return;
+            router.push("/menu");
+          }}
+          className="flex items-center gap-2 text-sm text-coffee-800/60 hover:text-coffee-500 transition-colors mb-5"
         >
           <ArrowLeft className="w-4 h-4" />
           Kembali
@@ -181,16 +210,16 @@ export default function PaymentPage() {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                className="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-500/10 border border-emerald-400/20 flex items-center justify-center"
+                className="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center"
               >
-                <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
               </motion.div>
 
               <motion.h2
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-2xl font-bold text-white mb-1"
+                className="text-2xl font-bold text-coffee-950 mb-1"
               >
                 Pembayaran Berhasil!
               </motion.h2>
@@ -198,7 +227,7 @@ export default function PaymentPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="text-white/50 text-sm mb-8"
+                className="text-coffee-800/65 text-sm mb-8"
               >
                 Pesanan #{orderId} akan segera diproses
               </motion.p>
@@ -207,30 +236,30 @@ export default function PaymentPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden mb-6 text-left"
+                className="rounded-none border border-cream-200 bg-white overflow-hidden mb-6 text-left"
               >
                 <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/40">Status</span>
-                    <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span className="text-coffee-800/60">Status</span>
+                    <span className="text-emerald-700 font-semibold flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                       Lunas
                     </span>
                   </div>
-                  <div className="border-t border-white/[0.04]" />
+                  <div className="border-t border-cream-200" />
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/40">Metode</span>
-                    <span className="text-white/80">{PAYMENT_LABELS[method] || method}</span>
+                    <span className="text-coffee-800/60">Metode</span>
+                    <span className="text-coffee-950">{PAYMENT_LABELS[method] || method}</span>
                   </div>
-                  <div className="border-t border-white/[0.04]" />
+                  <div className="border-t border-cream-200" />
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/40">Total</span>
-                    <span className="text-white font-bold">Rp{(order?.total || 0).toLocaleString()}</span>
+                    <span className="text-coffee-800/60">Total</span>
+                    <span className="text-coffee-950 font-bold">Rp{(order?.total || 0).toLocaleString()}</span>
                   </div>
                 </div>
-                <div className="px-4 py-3 border-t border-white/[0.04] bg-white/[0.02] flex items-center gap-2 justify-center">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span className="text-xs text-emerald-300/60">Pembayaran terverifikasi</span>
+                <div className="px-4 py-3 border-t border-cream-200 bg-cream-50 flex items-center gap-2 justify-center">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="text-xs text-emerald-700/70">Pembayaran terverifikasi</span>
                 </div>
               </motion.div>
 
@@ -242,13 +271,13 @@ export default function PaymentPage() {
               >
                 <button
                   onClick={() => router.push("/menu")}
-                  className="w-full py-3 bg-coffee-500 text-white rounded-lg font-semibold hover:bg-coffee-400 transition-all"
+                  className="w-full py-3 bg-coffee-500 text-white rounded-none font-semibold hover:bg-coffee-600 transition-all"
                 >
                   Pesan Lagi
                 </button>
-                <p className="text-xs text-white/30 text-center">
+                <p className="text-xs text-coffee-800/50 text-center">
                   Ada masukan?{" "}
-                  <button onClick={() => router.push("/menu?f=1")} className="text-coffee-400 hover:text-coffee-300 underline">
+                  <button onClick={() => router.push("/menu?f=1")} className="text-coffee-500 hover:text-coffee-600 underline">
                     Kasih feedback
                   </button>
                 </p>
@@ -265,13 +294,13 @@ export default function PaymentPage() {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                className="w-14 h-14 mx-auto mb-4 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center"
+                className="w-14 h-14 mx-auto mb-4 rounded-none bg-white border border-cream-200 flex items-center justify-center"
               >
-                <Lock className="w-6 h-6 text-white/50" />
+                <Lock className="w-6 h-6 text-coffee-800/60" />
               </motion.div>
 
-              <h2 className="text-lg font-bold text-white mb-1">Pembayaran Online</h2>
-              <p className="text-sm text-white/50 mb-6">
+              <h2 className="text-lg font-bold text-coffee-950 mb-1">Pembayaran Online</h2>
+              <p className="text-sm text-coffee-800/65 mb-6">
                 Pesanan #{orderId} · Rp{(order?.total || 0).toLocaleString()}
               </p>
 
@@ -279,35 +308,35 @@ export default function PaymentPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden mb-6"
+                className="rounded-none border border-cream-200 bg-white overflow-hidden mb-6"
               >
                 <div className="p-6 text-center space-y-4">
-                  <div className="w-12 h-12 mx-auto rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center">
-                    <ExternalLink className="w-5 h-5 text-white/40" />
+                  <div className="w-12 h-12 mx-auto rounded-full bg-cream-100 border border-cream-200 flex items-center justify-center">
+                    <ExternalLink className="w-5 h-5 text-coffee-800/55" />
                   </div>
-                  <p className="text-white/60 text-sm">Mengarahkan ke halaman pembayaran Midtrans...</p>
+                  <p className="text-coffee-800/70 text-sm">Mengarahkan ke halaman pembayaran Midtrans...</p>
                   <div className="flex justify-center gap-2">
                     {[0, 0.15, 0.3].map((d) => (
                       <motion.div
                         key={d}
                         animate={{ y: [-2, 4, -2] }}
                         transition={{ duration: 0.8, repeat: Infinity, delay: d }}
-                        className="w-2 h-2 rounded-full bg-white/[0.15]"
+                        className="w-2 h-2 rounded-full bg-coffee-300"
                       />
                     ))}
                   </div>
                   {snapUrl && (
                     <button
                       onClick={handlePayNow}
-                      className="block w-full py-2.5 bg-coffee-500 text-white rounded-lg font-medium hover:bg-coffee-400 transition-all"
+                      className="block w-full py-2.5 bg-coffee-500 text-white rounded-none font-medium hover:bg-coffee-600 transition-all"
                     >
                       Lanjut ke Midtrans
                     </button>
                   )}
                 </div>
-                <div className="px-6 py-3 border-t border-white/[0.04] flex items-center justify-between bg-white/[0.02]">
-                  <span className="text-sm text-white/50">Total</span>
-                  <span className="text-base font-bold text-white">Rp{(order?.total || 0).toLocaleString()}</span>
+                <div className="px-6 py-3 border-t border-cream-200 flex items-center justify-between bg-cream-50">
+                  <span className="text-sm text-coffee-800/65">Total</span>
+                  <span className="text-base font-bold text-coffee-950">Rp{(order?.total || 0).toLocaleString()}</span>
                 </div>
               </motion.div>
             </motion.div>
@@ -322,33 +351,33 @@ export default function PaymentPage() {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                className="w-14 h-14 mx-auto mb-4 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center"
+                className="w-14 h-14 mx-auto mb-4 rounded-none bg-amber-50 border border-amber-200 flex items-center justify-center"
               >
-                <Clock className="w-6 h-6 text-white/40" />
+                <Clock className="w-6 h-6 text-amber-700" />
               </motion.div>
 
-              <h2 className="text-lg font-bold text-white mb-1">Menunggu Konfirmasi</h2>
-              <p className="text-sm text-white/50 mb-6">
+              <h2 className="text-lg font-bold text-coffee-950 mb-1">Menunggu Konfirmasi</h2>
+              <p className="text-sm text-coffee-800/65 mb-6">
                 Halaman ini akan update otomatis saat pembayaran terverifikasi
               </p>
 
-              <motion.div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden mb-6 p-4">
+              <motion.div className="rounded-none border border-cream-200 bg-white overflow-hidden mb-6 p-4">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/40">Status</span>
-                    <span className="text-amber-400 font-semibold flex items-center gap-1.5">
+                    <span className="text-coffee-800/60">Status</span>
+                    <span className="text-amber-700 font-semibold flex items-center gap-1.5">
                       <motion.span
                         animate={{ opacity: [1, 0.3, 1] }}
                         transition={{ duration: 2, repeat: Infinity }}
-                        className="w-1.5 h-1.5 rounded-full bg-amber-400"
+                        className="w-1.5 h-1.5 rounded-full bg-amber-500"
                       />
                       Menunggu
                     </span>
                   </div>
-                  <div className="border-t border-white/[0.04]" />
+                  <div className="border-t border-cream-200" />
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/40">Total</span>
-                    <span className="text-white font-bold">Rp{(order?.total || 0).toLocaleString()}</span>
+                    <span className="text-coffee-800/60">Total</span>
+                    <span className="text-coffee-950 font-bold">Rp{(order?.total || 0).toLocaleString()}</span>
                   </div>
                 </div>
               </motion.div>
@@ -356,13 +385,13 @@ export default function PaymentPage() {
               <div className="flex gap-3">
                 <button
                   onClick={handlePayNow}
-                  className="flex-1 py-2.5 border border-white/[0.08] bg-white/[0.04] text-white/50 rounded-lg text-sm hover:bg-white/[0.08] transition-all"
+                  className="flex-1 py-2.5 border border-cream-200 bg-white text-coffee-800/70 rounded-none text-sm hover:bg-cream-100 transition-all"
                 >
                   Bayar Ulang
                 </button>
                 <button
                   onClick={() => router.push("/menu")}
-                  className="flex-1 py-2.5 bg-coffee-500 text-white rounded-lg text-sm font-medium hover:bg-coffee-400 transition-all"
+                  className="flex-1 py-2.5 bg-coffee-500 text-white rounded-none text-sm font-medium hover:bg-coffee-600 transition-all"
                 >
                   Ke Menu
                 </button>
@@ -379,20 +408,20 @@ export default function PaymentPage() {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                  className="w-12 h-12 mx-auto mb-3 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center"
+                  className="w-12 h-12 mx-auto mb-3 rounded-none bg-white border border-cream-200 flex items-center justify-center"
                 >
                   {isVA ? (
-                    <Building2 className="w-5 h-5 text-white/40" />
+                    <Building2 className="w-5 h-5 text-coffee-800/55" />
                   ) : isQris || isGopay ? (
-                    <QrCode className="w-5 h-5 text-white/40" />
+                    <QrCode className="w-5 h-5 text-coffee-800/55" />
                   ) : (
-                    <Wallet className="w-5 h-5 text-white/40" />
+                    <Wallet className="w-5 h-5 text-coffee-800/55" />
                   )}
                 </motion.div>
-                <h2 className="text-lg font-bold text-white">
+                <h2 className="text-lg font-bold text-coffee-950">
                   {PAYMENT_LABELS[method] || "Pembayaran"}
                 </h2>
-                <p className="text-sm text-white/40 mt-0.5">
+                <p className="text-sm text-coffee-800/60 mt-0.5">
                   Pesanan #{orderId} · Rp{(order?.total || 0).toLocaleString()}
                 </p>
               </div>
@@ -401,11 +430,11 @@ export default function PaymentPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden mb-4"
+                className="rounded-none border border-cream-200 bg-white overflow-hidden mb-4"
               >
                 {(isQris || isGopay) && (
                   <div className="p-5 text-center space-y-4">
-                    <p className="text-sm text-white/50">
+                    <p className="text-sm text-coffee-800/65">
                       {isQris ? "Scan QRIS dengan aplikasi e-wallet" : "Scan QRIS dengan GoPay"}
                     </p>
                     {qrDataUrl ? (
@@ -413,13 +442,13 @@ export default function PaymentPage() {
                         initial={{ scale: 0.9, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ delay: 0.2 }}
-                        className="inline-block p-3 bg-white rounded-xl"
+                        className="inline-block p-3 bg-white border border-cream-200 rounded-none"
                       >
                         <img src={qrDataUrl} alt="QR Code" className="w-52 h-52 mx-auto" />
                       </motion.div>
                     ) : (
-                      <div className="w-52 h-52 mx-auto rounded-xl bg-white/[0.04] flex items-center justify-center border border-white/[0.06]">
-                        <QrCode className="w-10 h-10 text-white/20" />
+                      <div className="w-52 h-52 mx-auto rounded-none bg-cream-50 flex items-center justify-center border border-cream-200">
+                        <QrCode className="w-10 h-10 text-coffee-800/25" />
                       </div>
                     )}
                   </div>
@@ -427,46 +456,46 @@ export default function PaymentPage() {
                 {isVA && (
                   <div className="p-5 space-y-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center">
-                        <Building2 className="w-4 h-4 text-white/50" />
+                      <div className="w-8 h-8 rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center">
+                        <Building2 className="w-4 h-4 text-coffee-800/60" />
                       </div>
-                      <span className="text-sm font-medium text-white/70">{session?.bankName || "Bank"}</span>
+                      <span className="text-sm font-medium text-coffee-950">{session?.bankName || "Bank"}</span>
                     </div>
                     <div>
-                      <p className="text-xs text-white/40 mb-1.5">Nomor Virtual Account</p>
+                      <p className="text-xs text-coffee-800/60 mb-1.5">Nomor Virtual Account</p>
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-white/[0.04] rounded-lg px-3 py-2.5 border border-white/[0.08]">
-                          <span className="text-base font-mono font-bold text-white tracking-wider">
+                        <div className="flex-1 bg-cream-50 rounded-none px-3 py-2.5 border border-cream-200">
+                          <span className="text-base font-mono font-bold text-coffee-950 tracking-wider">
                             {session?.vaNumber || "---"}
                           </span>
                         </div>
                         <button
                           onClick={() => copyToClipboard(session?.vaNumber || "")}
-                          className="w-10 h-10 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center hover:bg-white/[0.1] transition-all shrink-0"
+                          className="w-10 h-10 rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center hover:bg-cream-200 transition-all shrink-0"
                         >
                           {copied ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                           ) : (
-                            <Copy className="w-4 h-4 text-white/50" />
+                            <Copy className="w-4 h-4 text-coffee-800/60" />
                           )}
                         </button>
                       </div>
                     </div>
-                    <div className="p-2.5 rounded-lg border border-amber-400/10 bg-amber-500/5">
-                      <p className="text-xs text-amber-300/60">Transfer ke nomor VA di atas. Pembayaran diverifikasi otomatis.</p>
+                    <div className="p-2.5 rounded-none border border-amber-200 bg-amber-50">
+                      <p className="text-xs text-amber-800/80">Transfer ke nomor VA di atas. Pembayaran diverifikasi otomatis.</p>
                     </div>
                   </div>
                 )}
                 {isCash && (
                   <div className="p-6 text-center space-y-2">
-                    <Wallet className="w-8 h-8 text-white/30 mx-auto" />
-                    <p className="text-sm text-white/60 font-medium">Bayar di Kasir</p>
-                    <p className="text-xs text-white/30">Silakan ke kasir untuk melakukan pembayaran langsung.</p>
+                    <Wallet className="w-8 h-8 text-coffee-800/40 mx-auto" />
+                    <p className="text-sm text-coffee-950 font-medium">Bayar di Kasir</p>
+                    <p className="text-xs text-coffee-800/55">Silakan ke kasir untuk melakukan pembayaran langsung.</p>
                   </div>
                 )}
-                <div className="px-5 py-3 border-t border-white/[0.04] flex items-center justify-between bg-white/[0.02]">
-                  <span className="text-sm text-white/50">Total</span>
-                  <span className="text-base font-bold text-white">Rp{(order?.total || 0).toLocaleString()}</span>
+                <div className="px-5 py-3 border-t border-cream-200 flex items-center justify-between bg-cream-50">
+                  <span className="text-sm text-coffee-800/65">Total</span>
+                  <span className="text-base font-bold text-coffee-950">Rp{(order?.total || 0).toLocaleString()}</span>
                 </div>
               </motion.div>
 
@@ -474,7 +503,7 @@ export default function PaymentPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="flex items-center justify-center gap-2 text-sm text-white/30"
+                className="flex items-center justify-center gap-2 text-sm text-coffee-800/50"
               >
                 <Clock className="w-3.5 h-3.5" />
                 <span>Menunggu pembayaran...</span>

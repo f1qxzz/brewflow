@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ShoppingBag, Coffee, Plus } from "lucide-react";
+import Image from "next/image";
+import { ShoppingBag, Coffee, CheckCircle2, AlertCircle } from "lucide-react";
 import type { MenuItem, CartItem } from "@/types";
 import type { PaymentMethod } from "@/lib/payment";
 import MenuHeader from "@/components/MenuHeader";
@@ -15,7 +16,7 @@ import OrderConfirm from "@/components/OrderConfirm";
 const Skeleton = () => (
   <div className="space-y-3">
     {[1, 2, 3].map((i) => (
-      <div key={i} className="h-28 rounded-2xl bg-white/[0.04]" />
+      <div key={i} className="h-28 rounded-none bg-cream-100 border border-cream-200" />
     ))}
   </div>
 );
@@ -38,12 +39,20 @@ export default function MenuPage() {
   const [tableOrders, setTableOrders] = useState<any[]>([]);
   const [tableOrdersLoaded, setTableOrdersLoaded] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [tableLocked, setTableLocked] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+
+  const showToast = useCallback((type: "success" | "error", msg: string) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get("table");
     if (t) {
       setTable(t);
+      setTableLocked(true);
       fetch("/api/orders?table=" + encodeURIComponent(t))
         .then((r) => r.json())
         .then((data) => setTableOrders(data))
@@ -61,6 +70,26 @@ export default function MenuPage() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+
+    // ponytail: restore order online yang belum dibayar biar nggak hilang waktu tab/payment ditutup
+    (async () => {
+      try {
+        const raw = localStorage.getItem("brewflow:pendingOrder");
+        if (!raw) return;
+        const stored = JSON.parse(raw);
+        if (!stored?.id) return localStorage.removeItem("brewflow:pendingOrder");
+        const r = await fetch(`/api/payment/${stored.id}`);
+        const data = r.ok ? await r.json() : null;
+        if (data && data.paymentStatus !== "paid" && data.status !== "cancelled") {
+          setLastOrder({ ...stored, paymentStatus: data.paymentStatus, status: data.status });
+          setSubmitted(true);
+        } else {
+          localStorage.removeItem("brewflow:pendingOrder");
+        }
+      } catch {
+        localStorage.removeItem("brewflow:pendingOrder");
+      }
+    })();
   }, []);
 
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
@@ -89,19 +118,24 @@ export default function MenuPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customerName: name || "Anonim", tableNumber: table, items, paymentMethod: method }),
       });
-      if (!res.ok) throw new Error("Gagal kirim pesanan");
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Gagal kirim pesanan");
+      }
       const order = await res.json();
       setCart([]);
       setName("");
-      setTable("");
+      if (!tableLocked) setTable("");
       if (method === "cash") {
         setLastOrder({ ...order, items: cart });
         setSubmitted(true);
       } else {
-        window.location.href = `/payment/${order.id}`;
+        localStorage.setItem("brewflow:pendingOrder", JSON.stringify({ ...order, items: cart }));
+        window.location.href = `/payment/${order.id}?t=${encodeURIComponent(order.orderToken || "")}`;
       }
-    } catch {
-      alert("Gagal kirim pesanan. Coba lagi.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Gagal kirim pesanan. Coba lagi.";
+      showToast("error", msg);
     }
   }
 
@@ -115,8 +149,9 @@ export default function MenuPage() {
       if (!res.ok) throw new Error("Gagal kirim feedback");
       setFeedback("");
       setRating(5);
+      showToast("success", "Thanks! Feedback terkirim ☕");
     } catch {
-      alert("Gagal kirim feedback");
+      showToast("error", "Gagal kirim feedback");
     }
   }
 
@@ -125,11 +160,12 @@ export default function MenuPage() {
   const cat = categories[activeCat] || null;
   const totalPages = cat ? Math.ceil(cat.items.length / perPage) : 0;
   const paginatedItems = cat?.items.slice(page * perPage, (page + 1) * perPage) ?? [];
+  const cartQtyMap = Object.fromEntries(cart.map((i) => [i.id, i.qty]));
 
   function selectCat(i: number) { setActiveCat(i); setPage(0); }
 
   return (
-    <div className="min-h-dvh bg-[#0C0A09] antialiased">
+    <div className="min-h-dvh bg-cream-50 antialiased">
       <div className="relative z-10">
         <MenuHeader itemCount={totalItems} />
 
@@ -143,7 +179,7 @@ export default function MenuPage() {
                 feedback={feedback}
                 onFeedbackChange={setFeedback}
                 onSubmitFeedback={submitFeedback}
-                onOrderAgain={() => { setSubmitted(false); setLastOrder(null); }}
+                onOrderAgain={() => { setSubmitted(false); setLastOrder(null); localStorage.removeItem("brewflow:pendingOrder"); }}
               />
             </div>
           ) : (
@@ -151,22 +187,17 @@ export default function MenuPage() {
               <section className="px-5 pt-24 pb-12 md:pb-16">
                 <div className="max-w-lg md:max-w-7xl mx-auto">
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                    className="space-y-4"
+                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                    className="space-y-3"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-coffee-500/10 border border-coffee-500/20 flex items-center justify-center">
-                        <Coffee className="w-5 h-5 text-coffee-300" />
-                      </div>
-                      <span className="text-xs font-medium text-white/40 uppercase tracking-widest">Brew & Co.</span>
-                    </div>
-                    <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight">
-                      Selamat Datang
+                    <span className="text-xs text-coffee-500 uppercase tracking-widest">Brew &amp; Co.</span>
+                    <h1 className="text-3xl md:text-4xl font-semibold text-coffee-950 leading-tight tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+                      Pilih menumu
                     </h1>
-                    <p className="text-sm md:text-base text-white/40 max-w-md leading-relaxed">
-                      Scan QR meja, pesan langsung dari HP — minuman & makanan siap sebelum lo turun.
+                    <p className="text-sm text-coffee-800/65 max-w-md leading-relaxed">
+                      Pesan langsung dari meja — diantar tanpa antre.
                     </p>
                   </motion.div>
                 </div>
@@ -183,13 +214,13 @@ export default function MenuPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center py-20"
                   >
-                    <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-white/[0.04] flex items-center justify-center">
-                      <ShoppingBag className="w-5 h-5 text-white/30" />
+                    <div className="w-12 h-12 mx-auto mb-4 rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center">
+                      <ShoppingBag className="w-5 h-5 text-coffee-800/40" />
                     </div>
-                    <p className="text-white/60 font-medium text-sm">{error}</p>
+                    <p className="text-coffee-950 font-medium text-sm">{error}</p>
                     <button
                       onClick={() => { setLoading(true); setError(""); fetch("/api/menu").then((r) => r.json()).then(setMenu).catch((e) => setError(e.message)).finally(() => setLoading(false)); }}
-                      className="mt-4 px-5 py-2.5 bg-white/[0.06] text-white/70 rounded-xl text-sm font-medium hover:bg-white/[0.1] transition-all"
+                      className="mt-4 px-5 py-2.5 bg-white border border-cream-200 text-coffee-800 rounded-none text-sm font-medium hover:bg-cream-100 transition-all"
                     >
                       Coba Lagi
                     </button>
@@ -203,22 +234,19 @@ export default function MenuPage() {
                         transition={{ duration: 0.3 }}
                         className="mb-6"
                       >
-                        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3.5">
+                        <div className="mb-6 border-b border-cream-200 pb-4">
                           <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tableOrders.length > 0 ? "bg-white/[0.06]" : "bg-white/[0.04]"}`}>
-                              <span className="text-sm">{tableOrders.length > 0 ? "☕" : "─"}</span>
-                            </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-white/80">Meja {table}</span>
+                                <span className="text-sm font-medium text-coffee-950">Meja {table}</span>
                                 {tableOrders.length > 0 && (
-                                  <span className="text-[10px] font-medium text-white/40 bg-white/[0.06] px-2 py-0.5 rounded-full">
-                                    {tableOrders.length} pesanan
+                                  <span className="text-[10px] text-coffee-800/55">
+                                    {tableOrders.length} pesanan aktif
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs text-white/30 mt-0.5">
-                                {tableOrders.length > 0 ? "Ada pesanan aktif — pesanan baru akan ditambahkan" : "Siap pesan"}
+                              <p className="text-xs text-coffee-800/50 mt-0.5">
+                                {tableOrders.length > 0 ? "Pesanan baru akan ditambahkan" : "Siap pesan"}
                               </p>
                             </div>
                           </div>
@@ -233,22 +261,26 @@ export default function MenuPage() {
                         transition={{ delay: 0.05, duration: 0.3 }}
                         className="mb-6"
                       >
-                        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 flex items-center gap-4">
-                          <div className="w-14 h-14 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
-                            <Coffee className="w-6 h-6 text-white/20" />
+                        <div className="mb-6 flex items-center gap-4 py-3 border-b border-cream-200">
+                          <div className="w-12 h-12 rounded-none bg-cream-100 border border-cream-200 overflow-hidden shrink-0 relative">
+                            {featured.image ? (
+                              <Image src={featured.image} alt={featured.name} fill className="object-cover" sizes="48px" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Coffee className="w-5 h-5 text-coffee-800/40" />
+                              </div>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-[10px] font-medium text-white/30 uppercase tracking-wider">Rekomendasi</span>
-                            </div>
-                            <h3 className="text-sm font-semibold text-white truncate">{featured.name}</h3>
-                            <p className="text-xs text-white/30 mt-0.5 line-clamp-1">{featured.description}</p>
+                            <span className="text-[10px] text-coffee-500 uppercase tracking-wider">Rekomendasi</span>
+                            <h3 className="text-sm font-medium text-coffee-950 truncate">{featured.name}</h3>
+                            <p className="text-xs text-coffee-800/50 mt-0.5 line-clamp-1">{featured.description}</p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="text-sm font-semibold text-white/80">Rp{featured.price.toLocaleString("id")}</p>
+                            <p className="text-sm text-coffee-800 font-mono">Rp{featured.price.toLocaleString("id")}</p>
                             <button
                               onClick={() => addItem(featured)}
-                              className="mt-1.5 px-3 py-1.5 text-xs font-medium bg-white/[0.06] text-white/70 rounded-lg hover:bg-white/[0.1] transition-all"
+                              className="mt-1.5 px-3 py-1.5 text-xs text-coffee-800 border border-cream-200 bg-white rounded-none hover:bg-cream-100 transition-colors"
                             >
                               + Tambah
                             </button>
@@ -262,7 +294,7 @@ export default function MenuPage() {
                     </div>
 
                     <div className="mt-6 mb-3 flex items-center justify-between">
-                      <p className="text-xs text-white/30">
+                      <p className="text-xs text-coffee-800/50">
                         {cat?.items.length || 0} item
                         {totalPages > 1 && ` · halaman ${page + 1}/${totalPages}`}
                       </p>
@@ -284,7 +316,7 @@ export default function MenuPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.04, duration: 0.3 }}
                           >
-                            <MenuItemCard item={item} onAdd={addItem} />
+                            <MenuItemCard item={item} qty={cartQtyMap[item.id] || 0} onAdd={addItem} onDec={(it) => updateQty(it.id, -1)} />
                           </motion.div>
                         ))}
                       </motion.div>
@@ -295,7 +327,7 @@ export default function MenuPage() {
                         <button
                           onClick={() => setPage(Math.max(0, page - 1))}
                           disabled={page === 0}
-                          className="w-8 h-8 rounded-lg text-xs text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-all disabled:opacity-20 disabled:pointer-events-none"
+                          className="w-9 h-9 min-h-[36px] rounded-none text-xs text-coffee-800/60 hover:text-coffee-950 hover:bg-cream-100 transition-all disabled:opacity-20 disabled:pointer-events-none"
                         >
                           ←
                         </button>
@@ -303,10 +335,10 @@ export default function MenuPage() {
                           <button
                             key={i}
                             onClick={() => setPage(i)}
-                            className={`w-8 h-8 rounded-lg text-xs font-medium transition-all ${
+                            className={`w-9 h-9 min-h-[36px] rounded-none text-xs font-medium transition-all ${
                               i === page
-                                ? "bg-white/[0.08] text-white"
-                                : "text-white/30 hover:text-white/60 hover:bg-white/[0.04]"
+                                ? "bg-coffee-500 text-white"
+                                : "text-coffee-800/60 hover:text-coffee-950 hover:bg-cream-100"
                             }`}
                           >
                             {i + 1}
@@ -315,7 +347,7 @@ export default function MenuPage() {
                         <button
                           onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                           disabled={page >= totalPages - 1}
-                          className="w-8 h-8 rounded-lg text-xs text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-all disabled:opacity-20 disabled:pointer-events-none"
+                          className="w-9 h-9 min-h-[36px] rounded-none text-xs text-coffee-800/60 hover:text-coffee-950 hover:bg-cream-100 transition-all disabled:opacity-20 disabled:pointer-events-none"
                         >
                           →
                         </button>
@@ -332,6 +364,7 @@ export default function MenuPage() {
                       onNameChange={setName}
                       table={table}
                       onTableChange={setTable}
+                      tableLocked={tableLocked}
                       total={total}
                       onSubmit={submitOrder}
                       onPaymentMethodChange={setPaymentMethod}
@@ -344,6 +377,30 @@ export default function MenuPage() {
           )}
         </main>
       </div>
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-3 rounded-none border shadow-lg max-w-[90vw] ${
+              toast.type === "success"
+                ? "bg-white border-emerald-200 text-emerald-800"
+                : "bg-white border-red-200 text-red-700"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 shrink-0" />
+            )}
+            <span className="text-sm font-medium">{toast.msg}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

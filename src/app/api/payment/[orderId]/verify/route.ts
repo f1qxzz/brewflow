@@ -1,13 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin, parseId } from "@/lib/admin-auth";
 
 export async function POST(req: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const auth = requireAdmin(req);
   if (auth) return auth;
 
   const { orderId } = await params;
-  const numId = Number(orderId);
+  const numId = parseId(orderId);
+  if (!numId) return NextResponse.json({ error: "ID tidak valid" }, { status: 400 });
 
   const existing = await prisma.order.findUnique({ where: { id: numId } });
   if (!existing) return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });

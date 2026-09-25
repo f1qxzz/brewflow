@@ -1,30 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  /* ----- Coffee palette ----- */
-  --color-coffee-950: #120A05;
-  --color-coffee-900: #1C0F08;
-  --color-coffee-800: #2C1810;
-  --color-coffee-700: #5C3A28;
-  --color-coffee-600: #7A4D32;
-  --color-coffee-500: #8B5E3C;
-  --color-coffee-400: #A87548;
-  --color-coffee-300: #C68642;
-  --color-coffee-200: #D4A574;
-  --color-coffee-100: #E8C9A8;
+  /* ----- Monochrome + single pop accent (kontras tegas) ----- */
+  --color-coffee-950: #0A0A0A;
+  --color-coffee-900: #141414;
+  --color-coffee-800: #1C1C1C;
+  --color-coffee-700: #3F3F3F;
+  --color-coffee-600: #A82C07;
+  --color-coffee-500: #D33A0A; /* pop vermilion — satu-satunya warna brand */
+  --color-coffee-400: #F0561F;
+  --color-coffee-300: #FF8A5C;
+  --color-coffee-200: #FFC9B4;
+  --color-coffee-100: #FFE9E0;
 
-  --color-cream-50:  #FDF8F3;
-  --color-cream-100: #F5EDE3;
-  --color-cream-200: #E8DDD0;
-  --color-cream-300: #D4C4B3;
+  --color-cream-50:  #F5F5F3;
+  --color-cream-100: #EDEDEA;
+  --color-cream-200: #D6D6D2;
+  --color-cream-300: #BDBDB8;
 
-  --color-sage-500: #7A9C7A;
+  --color-sage-500: #5F7F5F;
   --color-sage-200: #C8DCC8;
 
-  --color-rose-500: #D95C5C;
+  --color-rose-500: #C2413E;
   --color-rose-200: #F5C8C8;
 
-  /* ----- Animation ----- */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-expo:  cubic-bezier(0.4, 0, 1, 1);
   --duration-fast:   150ms;
@@ -33,19 +32,10 @@
 }
 
 :root {
-  --bg: #FDF8F3;
-  --fg: #1C0F08;
+  --bg: #F5F5F3;
+  --fg: #0A0A0A;
   --card: #FFFFFF;
-  --border: #E8DDD0;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0C0A09;
-    --fg: #F5F0EB;
-    --card: #1C1815;
-    --border: #2C2815;
-  }
+  --border: #D6D6D2;
 }
 
 body {
@@ -59,14 +49,6 @@ body {
 /* ----- Smooth scroll & focus ----- */
 html { scroll-behavior: smooth; }
 *:focus-visible { outline: 2px solid var(--color-coffee-500); outline-offset: 2px; }
-
-/* ----- Background texture (coffee flecks) ----- */
-.bg-texture {
-  background-image: radial-gradient(circle at 20% 30%, rgba(139,94,60,0.03) 0, transparent 2px),
-                    radial-gradient(circle at 80% 70%, rgba(139,94,60,0.04) 0, transparent 3px),
-                    radial-gradient(circle at 40% 90%, rgba(139,94,60,0.02) 0, transparent 2px);
-  background-size: 60px 60px, 80px 80px, 50px 50px;
-}
 
 /* ----- Order ticket tear line ----- */
 .ticket-tear {
@@ -134,3 +116,15 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
   50% { transform: scale(1.25); }
 }
 .cart-bounce { animation: cart-bounce 0.3s var(--ease-out-expo); }
+
+/* ----- Marquee strip (landing) ----- */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 28s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee { animation: none; }
+}
