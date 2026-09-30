@@ -1,0 +1,9 @@
+# upload CLI — jangan bawa file lokal/berat/berisi PII ke Vercel
+.env*
+envcheck.txt
+prisma/*.db*
+prisma/*.bak*
+.design-engine/
+tests/
+tmp-*
+*.md
