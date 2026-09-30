@@ -84,14 +84,14 @@ export default function LandingPage() {
         {/* Hero */}
         <section className="pt-16">
           <div className="max-w-6xl mx-auto px-5 sm:px-8 pt-10 md:pt-16 pb-12 md:pb-16">
-            <div className="grid md:grid-cols-12 gap-10 md:gap-14 items-center">
+            <div className="grid md:grid-cols-12 gap-10 md:gap-8 items-center">
               <div className="md:col-span-7">
                 <div className="anim-fade-up">
                   <p className="font-mono text-xs text-coffee-700 mb-5">
                     Kedai kopi &middot; Dipatiukur, Bandung
                   </p>
                   <h1
-                    className="text-[clamp(2.6rem,6vw,4.5rem)] font-black leading-[1.02] tracking-tight text-coffee-950"
+                    className="text-[clamp(2.6rem,6.8vw,5.125rem)] font-black leading-[1.02] tracking-tight text-coffee-950"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     Antre itu
@@ -122,7 +122,7 @@ export default function LandingPage() {
               <div className="md:col-span-5 anim-fade-up" style={{ animationDelay: "120ms" }}>
                 <div className="relative">
                   <div className="absolute inset-0 -translate-x-3 translate-y-3 border border-coffee-950" aria-hidden />
-                  <div className="relative aspect-[4/5] overflow-hidden border border-cream-300 bg-cream-100">
+                  <div className="relative aspect-[4/5] md:aspect-[3/4] overflow-hidden border border-cream-300 bg-cream-100">
                     <Image src="/images/coffee-detail.jpg" alt="Secangkir kopi Brew & Co." fill className="object-cover" sizes="(max-width: 768px) 100vw, 30vw" priority />
                   </div>
                 </div>
