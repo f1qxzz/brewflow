@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { createHash, timingSafeEqual } from "crypto";
 import { parsePaymentStatus } from "@/lib/midtrans";
-import { webhookSeen, rateLimitKey } from "@/lib/admin-auth";
+import { webhookSeen, rateLimitKey, clientKey } from "@/lib/admin-auth";
 
 function sigEqual(a: string, b: string): boolean {
   try {
@@ -17,7 +17,8 @@ function sigEqual(a: string, b: string): boolean {
 
 export async function POST(req: Request) {
   try {
-    const rl = rateLimitKey("wh:" + (req.headers.get("x-forwarded-for") || "local"), 30, 60_000);
+    // ponytail: clientKey = entry XFF terakhir (IP asli dari proxy) — string mentah XFF bisa dirotasi klien buat reset bucket (pentest L4)
+    const rl = rateLimitKey("wh:" + clientKey(req), 30, 60_000);
     if (rl) return rl;
 
     const sk = process.env.MIDTRANS_SERVER_KEY;

@@ -6,6 +6,7 @@ import NextImage from "next/image";
 import { ArrowLeft, QrCode, Copy, ExternalLink, Download, LayoutGrid, X, CheckCircle2 } from "lucide-react";
 import QRCode from "qrcode";
 import FadeUp from "@/components/FadeUp";
+import { useAdminToken } from "../layout";
 
 const TABLES = Array.from({ length: 10 }, (_, i) => i + 1);
 
@@ -16,12 +17,13 @@ const TABLES = Array.from({ length: 10 }, (_, i) => i + 1);
 const subscribeOrigin = () => () => {};
 const readOrigin = () => (typeof window === "undefined" ? "" : window.location.origin);
 
-function menuUrl(origin: string, table: number) {
-  return `${origin}/menu?table=${table}`;
+function menuUrl(origin: string, table: number, sig?: string) {
+  // tanpa sig (token admin belum kebaca) → link tetap jalan, kartu riwayat di /menu dilewati
+  return `${origin}/menu?table=${table}${sig ? "&s=" + sig : ""}`;
 }
 
-async function makeCard(origin: string, t: number): Promise<string> {
-  const qrData = await QRCode.toDataURL(menuUrl(origin, t), { margin: 1, width: 540, color: { dark: "#0A0A0A", light: "#FFFFFF" } });
+async function makeCard(origin: string, t: number, sig?: string): Promise<string> {
+  const qrData = await QRCode.toDataURL(menuUrl(origin, t, sig), { margin: 1, width: 540, color: { dark: "#0A0A0A", light: "#FFFFFF" } });
   const img = new Image();
   await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; img.src = qrData; });
   const c = document.createElement("canvas");
@@ -54,20 +56,30 @@ export default function QRPage() {
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [cards, setCards] = useState<Record<number, string>>({});
+  const [sigs, setSigs] = useState<Record<string, string>>({});
   const [copiedUrl, setCopiedUrl] = useState(false);
   const origin = useSyncExternalStore(subscribeOrigin, readOrigin, () => "");
+  const token = useAdminToken();
 
   useEffect(() => {
     if (!origin) return;
     let alive = true;
     (async () => {
       await document.fonts.ready;
+      let fresh: Record<string, string> = {};
+      if (token) {
+        try {
+          const r = await fetch("/api/admin/qr-token", { headers: { "x-admin-token": token } });
+          if (r.ok) fresh = await r.json();
+        } catch {}
+      }
+      if (alive) setSigs(fresh);
       const out: Record<number, string> = {};
-      for (const t of TABLES) out[t] = await makeCard(origin, t);
+      for (const t of TABLES) out[t] = await makeCard(origin, t, fresh[t]);
       if (alive) setCards(out);
     })();
     return () => { alive = false; };
-  }, [origin]);
+  }, [origin, token]);
 
   function downloadQR(table: number) {
     const data = cards[table];
@@ -81,7 +93,7 @@ export default function QRPage() {
 
   function copyLink(table: number) {
     if (!origin) return;
-    navigator.clipboard.writeText(menuUrl(origin, table));
+    navigator.clipboard.writeText(menuUrl(origin, table, sigs[table]));
   }
 
   return (
@@ -160,7 +172,7 @@ export default function QRPage() {
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-none bg-cream-100 border border-cream-200 text-coffee-950 text-sm hover:bg-cream-200 active:scale-95 transition-all">
                         <Copy className="w-3.5 h-3.5" /> Copy Link
                       </button>
-                      <a href={menuUrl(origin, selectedTable)} target="_blank"
+                      <a href={menuUrl(origin, selectedTable, sigs[selectedTable])} target="_blank"
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-none bg-cream-100 border border-cream-200 text-coffee-950 text-sm hover:bg-cream-200 active:scale-95 transition-all">
                         <ExternalLink className="w-3.5 h-3.5" /> Buka Menu
                       </a>

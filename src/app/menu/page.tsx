@@ -56,15 +56,20 @@ export default function MenuPage() {
     // ponytail: init ?table= dijalankan di async IIFE (bukan sync di body effect) biar
     // gak cascade render; efeknya sama — jalan pas mount, sebelum user sempat ngetik
     (async () => {
-      const t = new URLSearchParams(window.location.search).get("table");
-      if (!t) {
+      const p = new URLSearchParams(window.location.search);
+      const t = p.get("table");
+      const s = p.get("s");
+      if (!t || !s) {
+        // QR lama / akses manual: meja tetap keisi, kartu riwayat dilewatan (tanpa s server nolak)
         setTableOrdersLoaded(true);
+        if (t) { setTable(t); setTableLocked(true); }
       } else {
         setTable(t);
         setTableLocked(true);
         try {
-          const r = await fetch("/api/orders?table=" + encodeURIComponent(t));
-          setTableOrders(await r.json());
+          const r = await fetch("/api/orders?table=" + encodeURIComponent(t) + "&s=" + encodeURIComponent(s));
+          const d = await r.json();
+          setTableOrders(Array.isArray(d) ? d : []);
         } finally {
           setTableOrdersLoaded(true);
         }

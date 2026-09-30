@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { requireAdmin, rateLimitKey, clientKey, parseId } from "@/lib/admin-auth";
-import { signed } from "@/lib/sign";
+import { signed, verifySigned } from "@/lib/sign";
 
 const VALID_METHODS = ["cash", "qris", "va_bca", "va_mandiri", "va_bni", "gopay"] as const;
 
@@ -82,6 +82,11 @@ export async function GET(req: Request) {
   if (table) {
     const rl = rateLimitKey("tbl:" + clientKey(req), 60, 60_000);
     if (rl) return rl;
+
+    // ponytail: riwayat meja cuma buat pemegang QR — s = signed(table), sama pola dengan orderToken ?t= (pentest L3)
+    if (!verifySigned(url.searchParams.get("s"), table)) {
+      return NextResponse.json({ error: "Link QR tidak valid" }, { status: 403 });
+    }
 
     const orders = await prisma.order.findMany({
       where: {
