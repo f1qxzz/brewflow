@@ -26,8 +26,7 @@ const CAT_COLORS: Record<string, { bg: string; fg: string; accent: string }> = {
 function makeSVG(
   name: string,
   emoji: string,
-  cat: string,
-  filename: string
+  cat: string
 ): string {
   const c = CAT_COLORS[cat] || CAT_COLORS.kopi;
   const lines = name.toUpperCase().split(" ");
@@ -180,7 +179,7 @@ const items: [string, string, string, string][] = [
 console.log(`Generating ${items.length} SVG images...`);
 
 for (const [filename, name, emoji, cat] of items) {
-  const svg = makeSVG(name, emoji, cat, filename);
+  const svg = makeSVG(name, emoji, cat);
   writeFileSync(join(OUT, filename), svg, "utf8");
   console.log(`  ✅ ${filename}`);
 }

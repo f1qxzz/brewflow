@@ -16,13 +16,14 @@ const PAYMENT_METHODS: { id: PaymentMethod; label: string }[] = [
 ];
 
 export default function CartDrawer({
-  items, open, onClose, onUpdateQty, name, onNameChange, table, onTableChange, tableLocked, total, onSubmit, onPaymentMethodChange, paymentMethod,
+  items, open, onClose, onUpdateQty, name, onNameChange, table, onTableChange, tableLocked, total, onSubmit, onPaymentMethodChange, paymentMethod, submitting,
 }: {
   items: CartItem[]; open: boolean; onClose: () => void; onUpdateQty: (id: number, delta: number) => void;
   name: string; onNameChange: (v: string) => void; table: string; onTableChange: (v: string) => void;
   tableLocked?: boolean;
   total: number; onSubmit: (method: PaymentMethod) => void;
   onPaymentMethodChange: (m: PaymentMethod) => void; paymentMethod: PaymentMethod;
+  submitting?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [touched, setTouched] = useState(false);
@@ -74,7 +75,7 @@ export default function CartDrawer({
                   </div>
                   <div>
                     <h2 className="text-sm font-semibold text-coffee-950">Pesanan</h2>
-                    <p className="text-xs text-coffee-800/55">{items.length} item</p>
+                    <p className="text-xs text-coffee-800/70">{items.length} item</p>
                   </div>
                 </div>
                 <button
@@ -90,9 +91,9 @@ export default function CartDrawer({
                 {items.length === 0 ? (
                   <div className="text-center py-16">
                     <div className="w-12 h-12 mx-auto mb-3 rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center">
-                      <ShoppingBag className="w-5 h-5 text-coffee-800/35" />
+                      <ShoppingBag className="w-5 h-5 text-coffee-800/70" />
                     </div>
-                    <p className="text-coffee-800/55 text-sm">Keranjang kosong</p>
+                    <p className="text-coffee-800/70 text-sm">Keranjang kosong</p>
                     <button
                       onClick={onClose}
                       className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-coffee-500 text-white rounded-none text-sm font-medium hover:bg-coffee-600 transition-all"
@@ -115,7 +116,7 @@ export default function CartDrawer({
                       >
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-coffee-950 text-sm truncate">{item.name}</p>
-                          <p className="text-xs text-coffee-800/50 mt-0.5">
+                          <p className="text-xs text-coffee-800/70 mt-0.5">
                             Rp{item.price.toLocaleString()}
                           </p>
                         </div>
@@ -146,14 +147,14 @@ export default function CartDrawer({
 
               <div className="border-t border-cream-200 px-5 pt-4 pb-5 space-y-3 bg-cream-50">
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-coffee-800/45" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-coffee-800/70" />
                   <input
                     ref={inputRef}
                     value={name}
                     onChange={(e) => onNameChange(e.target.value)}
                     onBlur={() => setTouched(true)}
                     placeholder="Nama Pemesan *"
-                    className={`w-full pl-9 pr-3 py-2.5 min-h-[44px] rounded-none border bg-white text-sm text-coffee-950 placeholder:text-coffee-800/40 focus:outline-none focus:ring-1 focus:ring-coffee-500/50 focus:border-coffee-500 transition-all ${
+                    className={`w-full pl-9 pr-3 py-2.5 min-h-[44px] rounded-none border bg-white text-sm text-coffee-950 placeholder:text-coffee-800/60 focus:outline-none focus:ring-1 focus:ring-coffee-500/50 focus:border-coffee-500 transition-all ${
                       showNameErr ? "border-red-300" : "border-cream-200"
                     }`}
                   />
@@ -163,9 +164,9 @@ export default function CartDrawer({
                 </div>
                 <div className="relative">
                   {tableLocked ? (
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-coffee-800/45" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-coffee-800/70" />
                   ) : (
-                    <Table2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-coffee-800/45" />
+                    <Table2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-coffee-800/70" />
                   )}
                   <input
                     value={table}
@@ -173,18 +174,18 @@ export default function CartDrawer({
                     readOnly={tableLocked}
                     placeholder="No Meja"
                     title={tableLocked ? "Meja terkunci dari QR" : undefined}
-                    className={`w-full pl-9 pr-3 py-2.5 min-h-[44px] rounded-none border bg-white text-sm text-coffee-950 placeholder:text-coffee-800/40 focus:outline-none focus:ring-1 focus:ring-coffee-500/50 focus:border-coffee-500 transition-all ${
+                    className={`w-full pl-9 pr-3 py-2.5 min-h-[44px] rounded-none border bg-white text-sm text-coffee-950 placeholder:text-coffee-800/60 focus:outline-none focus:ring-1 focus:ring-coffee-500/50 focus:border-coffee-500 transition-all ${
                       tableLocked ? "opacity-70 cursor-not-allowed border-cream-200 bg-cream-100" : "border-cream-200"
                     }`}
                   />
                   {tableLocked && (
-                    <p className="text-[10px] text-coffee-800/45 mt-1 ml-1">Meja terkunci dari QR — tidak bisa diubah</p>
+                    <p className="text-[10px] text-coffee-800/70 mt-1 ml-1">Meja terkunci dari QR — tidak bisa diubah</p>
                   )}
                 </div>
 
                 {items.length > 0 && (
                   <div className="pt-1">
-                    <p className="text-[11px] text-coffee-800/55 font-medium uppercase tracking-wider mb-2">
+                    <p className="text-[11px] text-coffee-800/70 font-medium uppercase tracking-wider mb-2">
                       Metode Pembayaran
                     </p>
                     <div className="grid grid-cols-3 gap-1.5">
@@ -210,26 +211,28 @@ export default function CartDrawer({
 
                 <div className="flex items-center justify-between pt-1">
                   <div>
-                    <p className="text-xs text-coffee-800/55">Total</p>
+                    <p className="text-xs text-coffee-800/70">Total</p>
                     <p className="text-lg font-bold text-coffee-950">
                       Rp{total.toLocaleString("id")}
                     </p>
                   </div>
                   <button
-                    onClick={() => { setTouched(true); if (canSubmit) onSubmit(paymentMethod); }}
-                    disabled={!canSubmit}
+                    onClick={() => { setTouched(true); if (canSubmit && !submitting) onSubmit(paymentMethod); }}
+                    disabled={!canSubmit || submitting}
                     className={`flex items-center gap-2 px-5 py-3 min-h-[44px] text-sm font-semibold rounded-none transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
                       isBank || paymentMethod === "qris" || paymentMethod === "gopay"
-                        ? "bg-coffee-950 text-white hover:bg-coffee-800"
+                        ? "bg-[var(--fg)] text-[var(--bg)] hover:opacity-85"
                         : "bg-coffee-500 text-white hover:bg-coffee-600"
                     }`}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    {isBank || paymentMethod === "qris" || paymentMethod === "gopay" ? "Bayar Sekarang" : "Pesan"}
+                    {submitting
+                      ? "Mengirim..."
+                      : isBank || paymentMethod === "qris" || paymentMethod === "gopay" ? "Bayar Sekarang" : "Pesan"}
                   </button>
                 </div>
                 {!canSubmit && items.length > 0 && (
-                  <p className="text-[11px] text-coffee-800/55 text-center">Isi nama dulu buat lanjut</p>
+                  <p className="text-[11px] text-coffee-800/70 text-center">Isi nama dulu buat lanjut</p>
                 )}
               </div>
             </div>

@@ -38,12 +38,12 @@ export default function MenuItemCard({ item, qty, onAdd, onDec }: { item: MenuIt
             </span>
           </div>
           {item.description && (
-            <p className="text-xs text-coffee-800/55 leading-relaxed line-clamp-2">{item.description}</p>
+            <p className="text-xs text-coffee-800/70 leading-relaxed line-clamp-2">{item.description}</p>
           )}
           {qty === 0 ? (
             <button
               onClick={() => onAdd(item)}
-              className="w-full mt-1 py-2.5 min-h-[40px] rounded-none bg-cream-100 text-coffee-900 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-cream-200 transition-colors"
+              className="w-full mt-1 py-3 min-h-11 rounded-none bg-cream-100 text-coffee-900 text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-cream-200 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               Tambah
@@ -52,7 +52,7 @@ export default function MenuItemCard({ item, qty, onAdd, onDec }: { item: MenuIt
             <div className="flex items-center justify-between mt-1 py-0.5">
               <button
                 onClick={() => onDec(item)}
-                className="w-9 h-9 min-h-[36px] rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center hover:bg-cream-200 transition-colors"
+                className="w-11 h-11 rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center hover:bg-cream-200 transition-colors"
                 aria-label={`Kurangi ${item.name}`}
               >
                 <Minus className="w-3.5 h-3.5 text-coffee-800" />
@@ -60,7 +60,7 @@ export default function MenuItemCard({ item, qty, onAdd, onDec }: { item: MenuIt
               <span className="text-sm font-semibold text-coffee-950 min-w-[2ch] text-center">{qty}</span>
               <button
                 onClick={() => onAdd(item)}
-                className="w-9 h-9 min-h-[36px] rounded-none bg-coffee-500 text-white flex items-center justify-center hover:bg-coffee-600 transition-colors"
+                className="w-11 h-11 rounded-none bg-coffee-500 text-white flex items-center justify-center hover:bg-coffee-600 transition-colors"
                 aria-label={`Tambah ${item.name}`}
               >
                 <Plus className="w-3.5 h-3.5" />

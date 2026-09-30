@@ -1,34 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import Image from "next/image";
 import { X, Image as ImageIcon } from "lucide-react";
 
-type FormData = {
+export type MenuForm = {
   name: string; description: string; price: string; image: string;
   categoryId: number; available: boolean; order: string;
+};
+
+const EMPTY: MenuForm = {
+  name: "", description: "", price: "", image: "",
+  categoryId: 0, available: true, order: "0",
 };
 
 export default function MenuFormModal({
   open, onClose, onSubmit, categories, initial,
 }: {
   open: boolean; onClose: () => void;
-  onSubmit: (data: FormData) => Promise<void>;
+  onSubmit: (data: MenuForm) => Promise<void>;
   categories: { id: number; name: string }[];
-  initial?: FormData | null;
+  initial?: MenuForm | null;
 }) {
-  const [form, setForm] = useState<FormData>({
-    name: "", description: "", price: "", image: "",
-    categoryId: categories[0]?.id || 0, available: true, order: "0",
-  });
+  // ponytail: reset via `key` di parent (edit-{id}/new) → gak perlu effect sync state
+  const [form, setForm] = useState<MenuForm>(() => initial ?? { ...EMPTY, categoryId: categories[0]?.id || 0 });
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      if (initial) setForm(initial);
-      else setForm({ name: "", description: "", price: "", image: "", categoryId: categories[0]?.id || 0, available: true, order: "0" });
-    }
-  }, [open, initial, categories]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,7 +36,7 @@ export default function MenuFormModal({
 
   const images = ["/images/espresso.jpg","/images/latte.jpg","/images/cappuccino.jpg","/images/mocha.jpg","/images/americano.jpg","/images/matcha-latte.jpg","/images/cold-brew.jpg","/images/v60.jpg","/images/croissant.jpg","/images/sandwich.jpg","/images/nasi-goreng.jpg","/images/spaghetti.jpg","/images/chicken-wings.jpg","/images/french-fries.jpg","/images/lemon-tea.jpg","/images/chocolate.jpg","/images/milkshake.jpg","/images/red-velvet.jpg","/images/cookies-cream.jpg"];
 
-  const inputCls = "w-full px-3.5 py-2.5 rounded-none border border-cream-200 bg-white text-sm text-coffee-950 placeholder:text-coffee-800/40 focus:outline-none focus:ring-2 focus:ring-coffee-500/30 transition-all";
+  const inputCls = "w-full px-3.5 py-2.5 rounded-none border border-cream-200 bg-white text-sm text-coffee-950 placeholder:text-coffee-800/60 focus:outline-none focus:ring-2 focus:ring-coffee-500/30 transition-all";
 
   return (
     <AnimatePresence>
@@ -65,32 +62,32 @@ export default function MenuFormModal({
 
             <form onSubmit={handleSubmit} className="p-4 space-y-4">
               <div>
-                <label className="text-xs text-coffee-800/60 mb-1.5 block">Nama Menu</label>
+                <label className="text-xs text-coffee-800/70 mb-1.5 block">Nama Menu</label>
                 <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className={inputCls} placeholder="Contoh: Espresso" />
               </div>
 
               <div>
-                <label className="text-xs text-coffee-800/60 mb-1.5 block">Deskripsi</label>
+                <label className="text-xs text-coffee-800/70 mb-1.5 block">Deskripsi</label>
                 <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
                   className={inputCls + " resize-none"} rows={2} placeholder="Deskripsi menu..." />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-coffee-800/60 mb-1.5 block">Harga (Rp)</label>
+                  <label className="text-xs text-coffee-800/70 mb-1.5 block">Harga (Rp)</label>
                   <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })}
                     className={inputCls + " font-mono"} placeholder="25000" />
                 </div>
                 <div>
-                  <label className="text-xs text-coffee-800/60 mb-1.5 block">Urutan</label>
+                  <label className="text-xs text-coffee-800/70 mb-1.5 block">Urutan</label>
                   <input type="number" value={form.order} onChange={(e) => setForm({ ...form, order: e.target.value })}
                     className={inputCls} placeholder="0" />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs text-coffee-800/60 mb-1.5 block">Kategori</label>
+                <label className="text-xs text-coffee-800/70 mb-1.5 block">Kategori</label>
                 <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: Number(e.target.value) })}
                   className={inputCls + " appearance-none"}>
                   {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -98,7 +95,7 @@ export default function MenuFormModal({
               </div>
 
               <div>
-                <label className="text-xs text-coffee-800/60 mb-1.5 block">Ketersediaan</label>
+                <label className="text-xs text-coffee-800/70 mb-1.5 block">Ketersediaan</label>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setForm({ ...form, available: true })}
                     className={`flex-1 py-2.5 rounded-none text-sm font-medium transition-all ${form.available ? "bg-emerald-600 text-white" : "bg-cream-50 text-coffee-800/70 border border-cream-200 hover:bg-cream-100"}`}>Tersedia</button>
@@ -108,9 +105,9 @@ export default function MenuFormModal({
               </div>
 
               <div>
-                <label className="text-xs text-coffee-800/60 mb-1.5 block">Gambar</label>
+                <label className="text-xs text-coffee-800/70 mb-1.5 block">Gambar</label>
                 <div className="flex items-center gap-2 mb-2">
-                  <ImageIcon className="w-4 h-4 text-coffee-800/45 shrink-0" />
+                  <ImageIcon className="w-4 h-4 text-coffee-800/70 shrink-0" />
                   <input value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })}
                     className={inputCls} placeholder="/images/espresso.jpg" />
                 </div>
@@ -118,7 +115,7 @@ export default function MenuFormModal({
                   {images.map((img) => (
                     <button key={img} type="button" onClick={() => setForm({ ...form, image: img })}
                       className={`shrink-0 w-12 h-12 rounded-none overflow-hidden border-2 transition-all ${form.image === img ? "border-coffee-500 ring-2 ring-coffee-500/30" : "border-cream-200 hover:border-cream-300"}`}>
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <Image src={img} alt="" width={48} height={48} className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>

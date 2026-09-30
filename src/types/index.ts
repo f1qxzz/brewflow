@@ -21,3 +21,10 @@ export type Feedback = {
   id: number; customerName: string; rating: number
   message: string; createdAt: string
 }
+
+// Pesanan yang lagi ditampilkan di layar konfirmasi — gabungan respons POST /orders
+// + item keranjang lokal; semua opsional karena jalur restore (localStorage) beda isi
+export type ConfirmedOrder = {
+  id?: number; status?: string; paymentStatus?: string
+  paymentMethod?: string; orderToken?: string; items?: CartItem[]
+}

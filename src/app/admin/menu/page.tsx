@@ -2,32 +2,47 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, Coffee, Plus, Pencil, Trash2, Circle, UtensilsCrossed, Search } from "lucide-react";
 import { useAdminToken } from "../layout";
-import MenuFormModal from "@/components/admin/MenuFormModal";
+import MenuFormModal, { type MenuForm } from "@/components/admin/MenuFormModal";
 import CategoryManager from "@/components/admin/CategoryManager";
 import FadeUp from "@/components/FadeUp";
+import type { Category, MenuItem } from "@/types";
 
 export default function MenuPage() {
   const token = useAdminToken();
-  const [menu, setMenu] = useState<any[]>([]);
+  const [menu, setMenu] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editItem, setEditItem] = useState<any>(null);
+  const [editItem, setEditItem] = useState<MenuItem | null>(null);
   const [showCatManager, setShowCatManager] = useState(false);
   const [search, setSearch] = useState("");
 
   const fetchMenu = useCallback(async () => {
     const res = await fetch("/api/menu?all=true", { headers: { "x-admin-token": token } });
-    setMenu(await res.json());
-    setLoading(false);
+    return (await res.json()) as Category[];
   }, [token]);
 
-  useEffect(() => { fetchMenu(); }, [fetchMenu]);
+  const refresh = useCallback(async () => {
+    setMenu(await fetchMenu());
+  }, [fetchMenu]);
 
-  const totalItems = menu.reduce((s: number, c: any) => s + (c.items?.length || 0), 0);
+  // ponytail: setState di dalam async IIFE (setelah await), bukan langsung di body effect
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const data = await fetchMenu();
+      if (!alive) return;
+      setMenu(data);
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [fetchMenu]);
 
-  async function saveItem(data: any) {
+  const totalItems = menu.reduce((s, c) => s + (c.items?.length || 0), 0);
+
+  async function saveItem(data: MenuForm) {
     const url = editItem ? `/api/menu/${editItem.id}` : "/api/menu";
     const method = editItem ? "PUT" : "POST";
     await fetch(url, {
@@ -35,19 +50,19 @@ export default function MenuPage() {
       body: JSON.stringify({ ...data, price: Number(data.price), order: Number(data.order), categoryId: Number(data.categoryId) }),
     });
     setEditItem(null);
-    fetchMenu();
+    refresh();
   }
 
   async function deleteItem(id: number) {
     if (!confirm("Hapus item ini?")) return;
     await fetch(`/api/menu/${id}`, { method: "DELETE", headers: { "x-admin-token": token } });
-    fetchMenu();
+    refresh();
   }
 
-  const filtered = menu.map((cat: any) => ({
+  const filtered = menu.map((cat) => ({
     ...cat,
-    items: cat.items.filter((i: any) => i.name.toLowerCase().includes(search.toLowerCase())),
-  })).filter((c: any) => c.items.length > 0);
+    items: cat.items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase())),
+  })).filter((c) => c.items.length > 0);
 
   return (
     <div className="min-h-dvh bg-cream-50">
@@ -74,7 +89,7 @@ export default function MenuPage() {
                 <UtensilsCrossed className="w-4 h-4 text-amber-700" />
               </div>
               <div>
-                <p className="text-xs text-coffee-800/60">Total Menu</p>
+                <p className="text-xs text-coffee-800/70">Total Menu</p>
                 <p className="text-lg font-bold text-coffee-950">{totalItems} item</p>
               </div>
             </div>
@@ -86,14 +101,14 @@ export default function MenuPage() {
 
           {showCatManager && (
             <div className="mb-5">
-              <CategoryManager categories={menu.map((c: any) => ({ id: c.id, name: c.name, slug: c.slug }))} onRefresh={fetchMenu} token={token} />
+              <CategoryManager categories={menu.map((c) => ({ id: c.id, name: c.name, slug: c.slug }))} onRefresh={refresh} token={token} />
             </div>
           )}
 
           <div className="relative mb-5">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-coffee-800/40" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-coffee-800/70" />
             <input value={search} onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-none border border-cream-200 bg-white text-sm text-coffee-950 placeholder:text-coffee-800/40 focus:outline-none focus:ring-2 focus:ring-coffee-500/30 transition-all" placeholder="Cari menu..." />
+              className="w-full pl-10 pr-4 py-2.5 rounded-none border border-cream-200 bg-white text-sm text-coffee-950 placeholder:text-coffee-800/60 focus:outline-none focus:ring-2 focus:ring-coffee-500/30 transition-all" placeholder="Cari menu..." />
           </div>
 
           {loading ? (
@@ -114,7 +129,7 @@ export default function MenuPage() {
               <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-cream-100 border border-cream-200 flex items-center justify-center">
                 <Coffee className="w-6 h-6 text-coffee-800/30" />
               </div>
-              <p className="text-coffee-800/60 font-medium">{search ? "Menu tidak ditemukan" : "Belum ada menu"}</p>
+              <p className="text-coffee-800/70 font-medium">{search ? "Menu tidak ditemukan" : "Belum ada menu"}</p>
               {!search && (
                 <button onClick={() => { setEditItem(null); setModalOpen(true); }}
                   className="mt-3 px-5 py-2.5 bg-coffee-500 text-white rounded-none text-sm font-medium hover:bg-coffee-600 transition-all">
@@ -124,18 +139,18 @@ export default function MenuPage() {
             </div>
           ) : (
             <div className="space-y-5">
-              {filtered.map((cat: any, ci: number) => (
+              {filtered.map((cat, ci) => (
                 <FadeUp key={cat.id} delay={Math.min(ci, 4) * 0.05}>
                   <div className="flex items-center gap-2 mb-3">
                     <Circle className="w-2.5 h-2.5 fill-coffee-500 text-coffee-500" />
                     <h2 className="font-bold text-coffee-950">{cat.name}</h2>
-                    <span className="text-xs text-coffee-800/55 font-normal">({cat.items.length})</span>
+                    <span className="text-xs text-coffee-800/70 font-normal">({cat.items.length})</span>
                   </div>
                   <div className="space-y-2">
-                    {cat.items.map((item: any) => (
+                    {cat.items.map((item) => (
                       <div key={item.id} className="flex items-center gap-3 bg-white rounded-none px-4 py-3 border border-cream-200 hover:border-cream-300 transition-all group">
                         {item.image && (
-                          <img src={item.image} alt="" className="w-10 h-10 rounded-none object-cover shrink-0" />
+                          <Image src={item.image} alt="" width={40} height={40} className="w-10 h-10 rounded-none object-cover shrink-0" />
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
@@ -148,13 +163,13 @@ export default function MenuPage() {
                               {item.available ? "Tersedia" : "Habis"}
                             </span>
                           </div>
-                          <p className="text-xs text-coffee-800/55 font-mono mt-0.5" style={{ fontFamily: "var(--font-mono)" }}>
+                          <p className="text-xs text-coffee-800/70 font-mono mt-0.5" style={{ fontFamily: "var(--font-mono)" }}>
                             Rp{item.price.toLocaleString()}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 transition-opacity">
                           <button onClick={() => { setEditItem(item); setModalOpen(true); }}
-                            className="w-8 h-8 rounded-full bg-cream-100 text-coffee-800/60 flex items-center justify-center hover:bg-cream-200 hover:text-coffee-950 transition-colors">
+                            className="w-8 h-8 rounded-full bg-cream-100 text-coffee-800/70 flex items-center justify-center hover:bg-cream-200 hover:text-coffee-950 transition-colors">
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button onClick={() => deleteItem(item.id)}
@@ -172,10 +187,11 @@ export default function MenuPage() {
         </main>
 
         <MenuFormModal
+          key={editItem ? `edit-${editItem.id}` : "new"}
           open={modalOpen}
           onClose={() => { setModalOpen(false); setEditItem(null); }}
           onSubmit={saveItem}
-          categories={menu.map((c: any) => ({ id: c.id, name: c.name }))}
+          categories={menu.map((c) => ({ id: c.id, name: c.name }))}
           initial={editItem ? { name: editItem.name, description: editItem.description, price: String(editItem.price), image: editItem.image, categoryId: editItem.categoryId, available: editItem.available, order: String(editItem.order) } : null}
         />
       </div>

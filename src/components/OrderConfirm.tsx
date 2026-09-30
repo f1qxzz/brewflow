@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { CheckCircle2, Clock, Coffee, CookingPot, RotateCcw, Send, Star } from "lucide-react";
+import type { ConfirmedOrder } from "@/types";
 
 const statusSteps = [
-  { key: "pending",   label: "Menunggu",         icon: Clock,        color: "text-amber-600" },
-  { key: "processed", label: "Diproses",          icon: CookingPot,   color: "text-blue-600" },
-  { key: "done",      label: "Selesai",           icon: CheckCircle2, color: "text-emerald-600" },
+  { key: "pending",   label: "Menunggu",         icon: Clock },
+  { key: "processed", label: "Diproses",          icon: CookingPot },
+  { key: "done",      label: "Selesai",           icon: CheckCircle2 },
 ];
 
 const statusOrder = ["pending", "processed", "done"];
@@ -20,7 +21,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 export default function OrderConfirm({
   order, rating, onRatingChange, feedback, onFeedbackChange, onSubmitFeedback, onOrderAgain,
 }: {
-  order: any; rating: number; onRatingChange: (n: number) => void;
+  order: ConfirmedOrder | null; rating: number; onRatingChange: (n: number) => void;
   feedback: string; onFeedbackChange: (v: string) => void;
   onSubmitFeedback: () => void; onOrderAgain: () => void;
 }) {
@@ -30,12 +31,15 @@ export default function OrderConfirm({
   const orderStatusIdx = statusOrder.indexOf(liveStatus);
   const isCash = order?.paymentMethod === "cash";
   const isPaid = livePaymentStatus === "paid";
+  const methodLabel = order?.paymentMethod
+    ? PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod
+    : "";
 
   useEffect(() => {
     if (!orderId || order?.status === "done" || order?.status === "cancelled") return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/orders/${orderId}`);
+        const res = await fetch(`/api/orders/${orderId}?t=${encodeURIComponent(order?.orderToken || "")}`);
         if (!res.ok) return;
         const data = await res.json();
         if (data.status && data.status !== liveStatus) setLiveStatus(data.status);
@@ -43,7 +47,7 @@ export default function OrderConfirm({
       } catch {}
     }, 5000);
     return () => clearInterval(interval);
-  }, [orderId, liveStatus, livePaymentStatus, order?.status, order?.paymentStatus]);
+  }, [orderId, liveStatus, livePaymentStatus, order?.status, order?.paymentStatus, order?.orderToken]);
 
   return (
     <div className="pt-4 md:pt-8">
@@ -112,12 +116,12 @@ export default function OrderConfirm({
           {isPaid ? (
             <>
               <CheckCircle2 className="w-4 h-4" />
-              Lunas via {PAYMENT_METHOD_LABELS[order?.paymentMethod] || order?.paymentMethod}
+              Lunas via {methodLabel}
             </>
           ) : (
             <>
               <Clock className="w-4 h-4" />
-              Menunggu Pembayaran · {PAYMENT_METHOD_LABELS[order?.paymentMethod] || order?.paymentMethod}
+              Menunggu Pembayaran · {methodLabel}
             </>
           )}
         </motion.div>
@@ -142,11 +146,11 @@ export default function OrderConfirm({
                       done ? "bg-emerald-100" : "bg-cream-100"
                     }`}>
                       <Icon className={`w-5 h-5 transition-all duration-500 ${
-                        done ? "text-emerald-600" : "text-coffee-800/35"
+                        done ? "text-emerald-600" : "text-coffee-800/70"
                       }`} />
                     </div>
                     <p className={`text-[10px] font-medium mt-1.5 transition-all duration-500 ${
-                      done ? "text-emerald-700" : "text-coffee-800/40"
+                      done ? "text-emerald-700" : "text-coffee-800/70"
                     }`}>
                       {step.label}
                     </p>
@@ -172,7 +176,7 @@ export default function OrderConfirm({
           className="rounded-none bg-white border border-cream-200 p-5 mb-4"
         >
           <p className="text-sm text-coffee-800/70 text-center">
-            Selesaikan pembayaran via {PAYMENT_METHOD_LABELS[order?.paymentMethod] || "metode yang dipilih"} untuk pesanan diproses.
+            Selesaikan pembayaran via {methodLabel || "metode yang dipilih"} untuk pesanan diproses.
           </p>
           <Link
             href={`/payment/${orderId}?t=${encodeURIComponent(order?.orderToken || "")}`}
@@ -193,12 +197,12 @@ export default function OrderConfirm({
         <div className="px-5 pt-4 pb-3 border-b border-dashed border-cream-200">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-coffee-500 uppercase tracking-wider">Brew & Co.</span>
-            <span className="text-[10px] text-coffee-800/55 font-mono">#{orderId}</span>
+            <span className="text-[10px] text-coffee-800/70 font-mono">#{orderId}</span>
           </div>
         </div>
 
         <div className="px-5 py-3 space-y-2.5">
-          {order?.items?.map((i: any, idx: number) => (
+          {order?.items?.map((i, idx) => (
             <motion.div
               key={idx}
               initial={{ opacity: 0, x: -10 }}
@@ -211,7 +215,7 @@ export default function OrderConfirm({
                 <span className="font-medium text-coffee-950 truncate">{i.name}</span>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <span className="text-coffee-800/55 text-xs">{i.qty}x</span>
+                <span className="text-coffee-800/70 text-xs">{i.qty}x</span>
                 <span className="font-mono text-sm font-semibold text-coffee-950">
                   Rp{(i.price * i.qty).toLocaleString()}
                 </span>
@@ -223,7 +227,7 @@ export default function OrderConfirm({
         <div className="px-5 py-3 border-t border-dashed border-cream-200 flex items-center justify-between">
           <span className="font-semibold text-coffee-950">Total</span>
           <span className="font-mono font-bold text-coffee-950 text-lg">
-            Rp{order?.items?.reduce((s: number, i: any) => s + i.price * i.qty, 0).toLocaleString()}
+            Rp{(order?.items?.reduce((s, i) => s + i.price * i.qty, 0) ?? 0).toLocaleString()}
           </span>
         </div>
       </motion.div>
@@ -236,7 +240,7 @@ export default function OrderConfirm({
         className="mt-8 bg-white rounded-none border border-cream-200 p-5"
       >
         <h3 className="font-semibold text-coffee-950 mb-1">Kasih Rating & Feedback</h3>
-        <p className="text-xs text-coffee-800/55 mb-4">Bantu kami terus improve pelayanan</p>
+        <p className="text-xs text-coffee-800/70 mb-4">Bantu kami terus improve pelayanan</p>
 
         <div className="flex justify-center gap-1.5 mb-4">
           {[1, 2, 3, 4, 5].map((n) => (
@@ -257,7 +261,7 @@ export default function OrderConfirm({
           onChange={(e) => onFeedbackChange(e.target.value)}
           placeholder="Tulis pesan kamu di sini..."
           rows={2}
-          className="w-full px-4 py-3 rounded-none border border-cream-200 bg-white text-sm text-coffee-950 placeholder:text-coffee-800/40 focus:outline-none focus:ring-2 focus:ring-coffee-500/40 focus:border-coffee-500 transition-all resize-none mb-3"
+          className="w-full px-4 py-3 rounded-none border border-cream-200 bg-white text-sm text-coffee-950 placeholder:text-coffee-800/60 focus:outline-none focus:ring-2 focus:ring-coffee-500/40 focus:border-coffee-500 transition-all resize-none mb-3"
         />
 
         <div className="flex gap-3">

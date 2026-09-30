@@ -31,7 +31,7 @@
     status_code: string;
     transaction_id: string;
     status_message?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   }
 
   interface SnapConfig {

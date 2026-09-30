@@ -7,7 +7,7 @@ export async function GET(req: Request) {
   const all = searchParams.get("all") === "true";
 
   if (all) {
-    const auth = requireAdmin(req);
+    const auth = await requireAdmin(req);
     if (auth) return auth;
   }
 
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   const body = await req.json();

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { createSession, checkRateLimit, safeEqual } from "@/lib/admin-auth";
+import { createSession, rateLimitGuard, safeEqual } from "@/lib/admin-auth";
 
 export async function POST(req: Request) {
-  const rate = checkRateLimit(req, 5, 60_000);
+  // brute-force PIN = jalur paling berharga — rate limit lintas-instance via tabel Guard
+  const rate = await rateLimitGuard(req, 5, 60_000);
   if (rate) return rate;
 
   const valid = process.env.ADMIN_PIN;

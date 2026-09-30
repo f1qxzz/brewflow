@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { motion, AnimatePresence } from "motion/react";
 import { CheckCircle2, Clock, Copy, ExternalLink, ArrowLeft, QrCode, Building2, Wallet, Lock } from "lucide-react";
 import QRCode from "qrcode";
@@ -23,7 +24,7 @@ export default function PaymentPage() {
   const isFinish = searchParams.get("status") === "finish";
 
   // token dari URL (?t=) — fallback: pendingOrder di localStorage (reload/bookmark lintas tab)
-  function tokenFor(id: number): string {
+  const tokenFor = useCallback((id: number): string => {
     const fromUrl = searchParams.get("t");
     if (fromUrl) return fromUrl;
     try {
@@ -31,23 +32,31 @@ export default function PaymentPage() {
       if (saved.orderToken && saved.id === id) return String(saved.orderToken);
     } catch {}
     return "";
-  }
+  }, [searchParams]);
 
-  const [order, setOrder] = useState<any>(null);
-  const [session, setSession] = useState<any>(null);
+  const [order, setOrder] = useState<{ total?: number; paymentMethod?: string } | null>(null);
+  const [session, setSession] = useState<{ bankName?: string; vaNumber?: string; qrString?: string } | null>(null);
   const [snapUrl, setSnapUrl] = useState<string>("");
-  const [snapToken, setSnapToken] = useState<string>("");
   const [isMidtrans, setIsMidtrans] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [paid, setPaid] = useState(false);
-  const [redirecting, setRedirecting] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+  const verifyingRef = useRef(false);
   const navigating = useRef(false);
 
+  // ponytail: jeda singkat supaya user lihat status "memverifikasi" sebelum centang muncul
+  const finishPayment = useCallback(() => {
+    if (verifyingRef.current) return;
+    verifyingRef.current = true;
+    setVerifying(true);
+    setTimeout(() => setPaid(true), 1600);
+  }, []);
+
   useEffect(() => {
-    if (paid || loading || error) return;
+    if (paid || verifying || loading || error) return;
     const handler = (e: BeforeUnloadEvent) => {
       if (navigating.current) return;
       e.preventDefault();
@@ -55,18 +64,18 @@ export default function PaymentPage() {
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [paid, loading, error]);
+  }, [paid, verifying, loading, error]);
 
   useEffect(() => {
     if (!orderId) return;
     (async () => {
       try {
-        const orderRes = await fetch(`/api/payment/${orderId}`);
+        const orderRes = await fetch(`/api/payment/${orderId}?t=${encodeURIComponent(tokenFor(orderId))}`);
         if (!orderRes.ok) throw new Error("Order tidak ditemukan");
         const orderData = await orderRes.json();
         setOrder(orderData);
         if (orderData.paymentStatus === "paid") {
-          setPaid(true);
+          finishPayment();
           setLoading(false);
           return;
         }
@@ -83,7 +92,6 @@ export default function PaymentPage() {
         setIsMidtrans(sessionData.isMidtrans);
         if (sessionData.isMidtrans && sessionData.snap) {
           setSnapUrl(sessionData.snap.redirect_url);
-          setSnapToken(sessionData.snap.token);
         } else if (sessionData.session) {
           setSession(sessionData.session);
           if (sessionData.session.qrString) {
@@ -93,38 +101,37 @@ export default function PaymentPage() {
             setQrDataUrl(url);
           }
         }
-      } catch (e: any) {
-        setError(e.message);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Gagal memuat pembayaran");
       } finally {
         setLoading(false);
       }
     })();
-  }, [orderId]);
+  }, [orderId, tokenFor, finishPayment]);
 
   useEffect(() => {
-    if (snapUrl && !isFinish && !paid) {
-      setRedirecting(true);
+    if (snapUrl && !isFinish && !paid && !verifying) {
       const timer = setTimeout(() => { navigating.current = true; window.location.href = snapUrl; }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [snapUrl, isFinish, paid]);
+  }, [snapUrl, isFinish, paid, verifying]);
 
   useEffect(() => {
-    if (paid || !orderId) return;
+    if (paid || verifying || !orderId) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/payment/${orderId}`);
+        const res = await fetch(`/api/payment/${orderId}?t=${encodeURIComponent(tokenFor(orderId))}`);
         if (!res.ok) return;
         const data = await res.json();
         setOrder(data);
         if (data.paymentStatus === "paid") {
-          setPaid(true);
+          finishPayment();
           clearInterval(interval);
         }
       } catch {}
     }, 5000);
     return () => clearInterval(interval);
-  }, [orderId, paid]);
+  }, [orderId, paid, verifying, tokenFor, finishPayment]);
 
   const copyToClipboard = useCallback(async (text: string) => {
     try {
@@ -149,7 +156,7 @@ export default function PaymentPage() {
             <div className="absolute inset-0 rounded-full border-2 border-cream-200" />
             <div className="absolute inset-0 rounded-full border-2 border-coffee-500 border-t-transparent animate-spin" />
           </div>
-          <p className="text-coffee-800/60 text-sm">Menyiapkan pembayaran...</p>
+          <p className="text-coffee-800/70 text-sm">Menyiapkan pembayaran...</p>
         </div>
       </div>
     );
@@ -160,7 +167,7 @@ export default function PaymentPage() {
       <div className="min-h-dvh bg-cream-50 flex items-center justify-center">
         <div className="text-center max-w-sm mx-auto px-4">
           <div className="w-14 h-14 mx-auto mb-4 rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center">
-            <Clock className="w-6 h-6 text-coffee-800/50" />
+            <Clock className="w-6 h-6 text-coffee-800/70" />
           </div>
           <h2 className="text-lg font-bold text-coffee-950 mb-1">Oops!</h2>
           <p className="text-sm text-coffee-800/65 mb-6">{error}</p>
@@ -176,6 +183,7 @@ export default function PaymentPage() {
   }
 
   const method = order?.paymentMethod;
+  const methodLabel = method ? PAYMENT_LABELS[method] || method : "";
   const isQris = method === "qris";
   const isGopay = method === "gopay";
   const isVA = method?.startsWith("va_");
@@ -188,10 +196,10 @@ export default function PaymentPage() {
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           onClick={() => {
-            if (!paid && !window.confirm("Pembayaran belum selesai. Tinggalkan halaman pembayaran?")) return;
+            if (!paid && !verifying && !window.confirm("Pembayaran belum selesai. Tinggalkan halaman pembayaran?")) return;
             router.push("/menu");
           }}
-          className="flex items-center gap-2 text-sm text-coffee-800/60 hover:text-coffee-500 transition-colors mb-5"
+          className="flex items-center gap-2 text-sm text-coffee-800/70 hover:text-coffee-500 transition-colors mb-5"
         >
           <ArrowLeft className="w-4 h-4" />
           Kembali
@@ -240,7 +248,7 @@ export default function PaymentPage() {
               >
                 <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-coffee-800/60">Status</span>
+                    <span className="text-coffee-800/70">Status</span>
                     <span className="text-emerald-700 font-semibold flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                       Lunas
@@ -248,12 +256,12 @@ export default function PaymentPage() {
                   </div>
                   <div className="border-t border-cream-200" />
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-coffee-800/60">Metode</span>
-                    <span className="text-coffee-950">{PAYMENT_LABELS[method] || method}</span>
+                    <span className="text-coffee-800/70">Metode</span>
+                    <span className="text-coffee-950">{methodLabel}</span>
                   </div>
                   <div className="border-t border-cream-200" />
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-coffee-800/60">Total</span>
+                    <span className="text-coffee-800/70">Total</span>
                     <span className="text-coffee-950 font-bold">Rp{(order?.total || 0).toLocaleString()}</span>
                   </div>
                 </div>
@@ -275,13 +283,59 @@ export default function PaymentPage() {
                 >
                   Pesan Lagi
                 </button>
-                <p className="text-xs text-coffee-800/50 text-center">
+                <p className="text-xs text-coffee-800/70 text-center">
                   Ada masukan?{" "}
                   <button onClick={() => router.push("/menu?f=1")} className="text-coffee-500 hover:text-coffee-600 underline">
                     Kasih feedback
                   </button>
                 </p>
               </motion.div>
+            </motion.div>
+          ) : verifying ? (
+            <motion.div
+              key="verifying"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-center pt-8"
+            >
+              <div className="relative mx-auto w-20 h-20 mb-6">
+                <div className="absolute inset-0 rounded-full border-2 border-cream-200" />
+                <div className="absolute inset-0 rounded-full border-2 border-coffee-500 border-t-transparent animate-spin" />
+              </div>
+
+              <h2 className="text-2xl font-bold text-coffee-950 mb-1">Memverifikasi pembayaran...</h2>
+              <p className="text-coffee-800/65 text-sm mb-8">Tunggu sebentar, jangan tutup halaman ini</p>
+
+              <div className="rounded-none border border-cream-200 bg-white overflow-hidden mb-6 text-left">
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-coffee-800/70">Status</span>
+                    <span className="text-amber-700 font-semibold flex items-center gap-1.5">
+                      <motion.span
+                        animate={{ opacity: [1, 0.3, 1] }}
+                        transition={{ duration: 1.2, repeat: Infinity }}
+                        className="w-1.5 h-1.5 rounded-full bg-amber-500"
+                      />
+                      Diproses
+                    </span>
+                  </div>
+                  <div className="border-t border-cream-200" />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-coffee-800/70">Metode</span>
+                    <span className="text-coffee-950">{methodLabel}</span>
+                  </div>
+                  <div className="border-t border-cream-200" />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-coffee-800/70">Total</span>
+                    <span className="text-coffee-950 font-bold">Rp{(order?.total || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="px-4 py-3 border-t border-cream-200 bg-cream-50 flex items-center gap-2 justify-center">
+                  <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="text-xs text-amber-700/80">Cek mutasi pembayaran...</span>
+                </div>
+              </div>
             </motion.div>
           ) : isMidtrans && !isFinish ? (
             <motion.div
@@ -296,7 +350,7 @@ export default function PaymentPage() {
                 transition={{ type: "spring", stiffness: 200, damping: 15 }}
                 className="w-14 h-14 mx-auto mb-4 rounded-none bg-white border border-cream-200 flex items-center justify-center"
               >
-                <Lock className="w-6 h-6 text-coffee-800/60" />
+                <Lock className="w-6 h-6 text-coffee-800/70" />
               </motion.div>
 
               <h2 className="text-lg font-bold text-coffee-950 mb-1">Pembayaran Online</h2>
@@ -312,7 +366,7 @@ export default function PaymentPage() {
               >
                 <div className="p-6 text-center space-y-4">
                   <div className="w-12 h-12 mx-auto rounded-full bg-cream-100 border border-cream-200 flex items-center justify-center">
-                    <ExternalLink className="w-5 h-5 text-coffee-800/55" />
+                    <ExternalLink className="w-5 h-5 text-coffee-800/70" />
                   </div>
                   <p className="text-coffee-800/70 text-sm">Mengarahkan ke halaman pembayaran Midtrans...</p>
                   <div className="flex justify-center gap-2">
@@ -364,7 +418,7 @@ export default function PaymentPage() {
               <motion.div className="rounded-none border border-cream-200 bg-white overflow-hidden mb-6 p-4">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-coffee-800/60">Status</span>
+                    <span className="text-coffee-800/70">Status</span>
                     <span className="text-amber-700 font-semibold flex items-center gap-1.5">
                       <motion.span
                         animate={{ opacity: [1, 0.3, 1] }}
@@ -376,7 +430,7 @@ export default function PaymentPage() {
                   </div>
                   <div className="border-t border-cream-200" />
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-coffee-800/60">Total</span>
+                    <span className="text-coffee-800/70">Total</span>
                     <span className="text-coffee-950 font-bold">Rp{(order?.total || 0).toLocaleString()}</span>
                   </div>
                 </div>
@@ -411,17 +465,17 @@ export default function PaymentPage() {
                   className="w-12 h-12 mx-auto mb-3 rounded-none bg-white border border-cream-200 flex items-center justify-center"
                 >
                   {isVA ? (
-                    <Building2 className="w-5 h-5 text-coffee-800/55" />
+                    <Building2 className="w-5 h-5 text-coffee-800/70" />
                   ) : isQris || isGopay ? (
-                    <QrCode className="w-5 h-5 text-coffee-800/55" />
+                    <QrCode className="w-5 h-5 text-coffee-800/70" />
                   ) : (
-                    <Wallet className="w-5 h-5 text-coffee-800/55" />
+                    <Wallet className="w-5 h-5 text-coffee-800/70" />
                   )}
                 </motion.div>
                 <h2 className="text-lg font-bold text-coffee-950">
-                  {PAYMENT_LABELS[method] || "Pembayaran"}
+                  {methodLabel || "Pembayaran"}
                 </h2>
-                <p className="text-sm text-coffee-800/60 mt-0.5">
+                <p className="text-sm text-coffee-800/70 mt-0.5">
                   Pesanan #{orderId} · Rp{(order?.total || 0).toLocaleString()}
                 </p>
               </div>
@@ -444,7 +498,7 @@ export default function PaymentPage() {
                         transition={{ delay: 0.2 }}
                         className="inline-block p-3 bg-white border border-cream-200 rounded-none"
                       >
-                        <img src={qrDataUrl} alt="QR Code" className="w-52 h-52 mx-auto" />
+                        <Image src={qrDataUrl} alt="QR Code" width={208} height={208} className="w-52 h-52 mx-auto" />
                       </motion.div>
                     ) : (
                       <div className="w-52 h-52 mx-auto rounded-none bg-cream-50 flex items-center justify-center border border-cream-200">
@@ -457,12 +511,12 @@ export default function PaymentPage() {
                   <div className="p-5 space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center">
-                        <Building2 className="w-4 h-4 text-coffee-800/60" />
+                        <Building2 className="w-4 h-4 text-coffee-800/70" />
                       </div>
                       <span className="text-sm font-medium text-coffee-950">{session?.bankName || "Bank"}</span>
                     </div>
                     <div>
-                      <p className="text-xs text-coffee-800/60 mb-1.5">Nomor Virtual Account</p>
+                      <p className="text-xs text-coffee-800/70 mb-1.5">Nomor Virtual Account</p>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-cream-50 rounded-none px-3 py-2.5 border border-cream-200">
                           <span className="text-base font-mono font-bold text-coffee-950 tracking-wider">
@@ -476,7 +530,7 @@ export default function PaymentPage() {
                           {copied ? (
                             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                           ) : (
-                            <Copy className="w-4 h-4 text-coffee-800/60" />
+                            <Copy className="w-4 h-4 text-coffee-800/70" />
                           )}
                         </button>
                       </div>
@@ -488,9 +542,9 @@ export default function PaymentPage() {
                 )}
                 {isCash && (
                   <div className="p-6 text-center space-y-2">
-                    <Wallet className="w-8 h-8 text-coffee-800/40 mx-auto" />
+                    <Wallet className="w-8 h-8 text-coffee-800/70 mx-auto" />
                     <p className="text-sm text-coffee-950 font-medium">Bayar di Kasir</p>
-                    <p className="text-xs text-coffee-800/55">Silakan ke kasir untuk melakukan pembayaran langsung.</p>
+                    <p className="text-xs text-coffee-800/70">Silakan ke kasir untuk melakukan pembayaran langsung.</p>
                   </div>
                 )}
                 <div className="px-5 py-3 border-t border-cream-200 flex items-center justify-between bg-cream-50">
@@ -503,7 +557,7 @@ export default function PaymentPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="flex items-center justify-center gap-2 text-sm text-coffee-800/50"
+                className="flex items-center justify-center gap-2 text-sm text-coffee-800/70"
               >
                 <Clock className="w-3.5 h-3.5" />
                 <span>Menunggu pembayaran...</span>

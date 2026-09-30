@@ -82,11 +82,11 @@ export default function CategoryManager({
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="w-2 h-2 rounded-full bg-coffee-500 shrink-0" />
                   <span className="text-sm text-coffee-950 truncate">{c.name}</span>
-                  <span className="text-[10px] text-coffee-800/45 font-mono">/{c.slug}</span>
+                  <span className="text-[10px] text-coffee-800/70 font-mono">/{c.slug}</span>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 transition-opacity">
                   <button onClick={() => { setEditing(c.id); setName(c.name); setSlug(c.slug); }}
-                    className="w-7 h-7 rounded-full bg-cream-100 text-coffee-800/60 flex items-center justify-center hover:bg-cream-200 hover:text-coffee-950 transition-colors">
+                    className="w-7 h-7 rounded-full bg-cream-100 text-coffee-800/70 flex items-center justify-center hover:bg-cream-200 hover:text-coffee-950 transition-colors">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => remove(c.id)}
@@ -108,9 +108,9 @@ export default function CategoryManager({
           >
             <div className="pt-3 mt-3 border-t border-cream-200 space-y-2">
               <input value={name} onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 rounded-none border border-cream-200 bg-white text-sm text-coffee-950 placeholder:text-coffee-800/40 focus:outline-none focus:ring-2 focus:ring-coffee-500/30" placeholder="Nama kategori" />
+                className="w-full px-3 py-2 rounded-none border border-cream-200 bg-white text-sm text-coffee-950 placeholder:text-coffee-800/60 focus:outline-none focus:ring-2 focus:ring-coffee-500/30" placeholder="Nama kategori" />
               <input value={slug} onChange={(e) => setSlug(e.target.value)}
-                className="w-full px-3 py-2 rounded-none border border-cream-200 bg-white text-sm text-coffee-800/70 placeholder:text-coffee-800/40 focus:outline-none focus:ring-2 focus:ring-coffee-500/30 font-mono" placeholder="slug-otomatis (opsional)" />
+                className="w-full px-3 py-2 rounded-none border border-cream-200 bg-white text-sm text-coffee-800/70 placeholder:text-coffee-800/60 focus:outline-none focus:ring-2 focus:ring-coffee-500/30 font-mono" placeholder="slug-otomatis (opsional)" />
               <div className="flex gap-2">
                 <button onClick={() => setAdding(false)}
                   className="flex-1 py-2 rounded-none border border-cream-200 text-coffee-800/70 text-sm font-medium hover:bg-cream-100 transition-all">Batal</button>

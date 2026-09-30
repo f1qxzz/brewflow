@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const rl = rateLimitKey("ord:" + clientKey(req), 20, 60_000);
   if (rl) return rl;
 
-  let body: any;
+  let body: { customerName?: unknown; tableNumber?: unknown; phone?: unknown; items?: unknown; paymentMethod?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -24,20 +24,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Terlalu banyak item" }, { status: 400 });
   }
 
-  const method = (VALID_METHODS as readonly string[]).includes(paymentMethod) ? paymentMethod : "cash";
+  const rawMethod = String(paymentMethod ?? "");
+  const method = (VALID_METHODS as readonly string[]).includes(rawMethod) ? rawMethod : "cash";
   const name = String(customerName || "").trim().slice(0, 100);
   const table = String(tableNumber || "").trim().slice(0, 10);
   let phoneStr = String(phone || "").replace(/[^\d+]/g, "").slice(0, 20);
   if (phoneStr && !/^\+?\d{8,15}$/.test(phoneStr)) phoneStr = "";
 
+  // harga selalu dari DB, qty di-clamp, item gak available dibuang
+  // ponytail: 1 query findMany (bukan N findUnique per item, bisa 50 query per order)
+  const wanted = (items as { id?: unknown; quantity?: unknown }[]).map((item) => ({
+    id: Number(item?.id),
+    qty: Math.min(99, Math.max(1, Math.floor(Number(item?.quantity) || 1))),
+  })).filter((i) => i.id > 0);
+
+  const menuItems = wanted.length
+    ? await prisma.menuItem.findMany({
+        where: { id: { in: wanted.map((i) => i.id) }, available: true },
+      })
+    : [];
+  const byId = new Map(menuItems.map((m) => [m.id, m]));
+
   let total = 0;
   const orderItems = [];
-  for (const item of items) {
-    const id = Number(item?.id);
-    const qty = Math.min(99, Math.max(1, Math.floor(Number(item?.quantity) || 1)));
-    if (!id) continue;
-    const menuItem = await prisma.menuItem.findUnique({ where: { id } });
-    if (!menuItem || !menuItem.available) continue;
+  for (const { id, qty } of wanted) {
+    const menuItem = byId.get(id);
+    if (!menuItem) continue;
     total += menuItem.price * qty;
     orderItems.push({ menuItemId: id, quantity: qty, price: menuItem.price });
   }
@@ -89,7 +101,7 @@ export async function GET(req: Request) {
     return NextResponse.json(orders);
   }
 
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   const orders = await prisma.order.findMany({
@@ -100,7 +112,7 @@ export async function GET(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   const { id, status } = await req.json();

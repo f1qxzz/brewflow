@@ -20,7 +20,7 @@ model MenuItem {
   id          Int         @id @default(autoincrement())
   name        String
   description String      @default("")
-  price       Float
+  price       Int
   image       String      @default("")
   categoryId  Int
   category    Category    @relation(fields: [categoryId], references: [id])
@@ -36,7 +36,7 @@ model Order {
   tableNumber     String      @default("")
   phone           String      @default("")
   status          String      @default("pending")
-  total           Float       @default(0)
+  total           Int         @default(0)
   paymentMethod   String      @default("cash")
   paymentStatus   String      @default("unpaid")
   paymentTrxId    String      @default("")
@@ -52,7 +52,7 @@ model OrderItem {
   menuItemId Int
   menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
   quantity   Int      @default(1)
-  price      Float
+  price      Int
 }
 
 model Feedback {
@@ -61,4 +61,12 @@ model Feedback {
   rating       Int
   message      String   @default("")
   createdAt    DateTime @default(now())
+}
+
+// ponytail: satu tabel buat 2 hal lintas-instance — rate limit (`rl:pin:<ip>`, resetAt=window end)
+// dan denylist logout (`rev:<token>`, resetAt=expiry token). Row expired dihapus on-read.
+model Guard {
+  key     String    @id
+  count   Int       @default(0)
+  resetAt DateTime?
 }

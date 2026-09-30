@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // no-referrer: URL payment bawa orderToken (?t=) — jangan ikut terkirim ke domain lain (mis. redirect Snap)
+  { key: "Referrer-Policy", value: "no-referrer" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
   { key: "X-DNS-Prefetch-Control", value: "off" },
   {
@@ -18,6 +19,8 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
+      // iframe Google Maps di section Kunjungi kami (default-src 'self' memblokir frame eksternal)
+      "frame-src 'self' https://www.google.com https://maps.google.com https://maps.google.co.id",
       "connect-src 'self' https://*.midtrans.com https://*.gopay.co.id",
       "frame-ancestors 'none'",
       "base-uri 'self'",

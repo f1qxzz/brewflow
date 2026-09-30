@@ -1,8 +1,11 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
 // ponytail: key = ADMIN_PIN, putar PIN = semua token mati (session + orderToken)
+// fail-closed: PIN gak diset = token gak bisa dipalsukan pakai key default
 function key(): string {
-  return process.env.ADMIN_PIN || "brewflow";
+  const k = process.env.ADMIN_PIN;
+  if (!k) throw new Error("ADMIN_PIN belum diset — token HMAC dinonaktifkan");
+  return k;
 }
 
 function mac(v: string): string {

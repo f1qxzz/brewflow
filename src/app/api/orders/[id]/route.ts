@@ -1,12 +1,22 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { requireAdmin, parseId } from "@/lib/admin-auth";
+import { verifySigned } from "@/lib/sign";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const numId = parseId(id);
   if (!numId) return NextResponse.json({ error: "ID tidak valid" }, { status: 400 });
-  const isAdmin = !requireAdmin(req);
+  const isAdmin = !(await requireAdmin(req));
+
+  if (!isAdmin) {
+    // ponytail: wajib orderToken sebelum query — ID sekuensial gak bisa di-enum; 401 sebelum 404 (no existence oracle)
+    const url = new URL(req.url);
+    const tok = req.headers.get("x-order-token") || url.searchParams.get("t");
+    if (!verifySigned(tok, String(numId))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
 
   if (isAdmin) {
     const order = await prisma.order.findUnique({
@@ -27,7 +37,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   const { id } = await params;

@@ -1,5 +1,7 @@
+-- Idempotent: boleh dijalankan ulang (turso-migrate) — CREATE ... IF NOT EXISTS
+
 -- CreateTable
-CREATE TABLE "Category" (
+CREATE TABLE IF NOT EXISTS "Category" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
@@ -8,7 +10,7 @@ CREATE TABLE "Category" (
 );
 
 -- CreateTable
-CREATE TABLE "MenuItem" (
+CREATE TABLE IF NOT EXISTS "MenuItem" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL DEFAULT '',
@@ -22,7 +24,7 @@ CREATE TABLE "MenuItem" (
 );
 
 -- CreateTable
-CREATE TABLE "Order" (
+CREATE TABLE IF NOT EXISTS "Order" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "customerName" TEXT NOT NULL DEFAULT '',
     "tableNumber" TEXT NOT NULL DEFAULT '',
@@ -37,7 +39,7 @@ CREATE TABLE "Order" (
 );
 
 -- CreateTable
-CREATE TABLE "OrderItem" (
+CREATE TABLE IF NOT EXISTS "OrderItem" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "orderId" INTEGER NOT NULL,
     "menuItemId" INTEGER NOT NULL,
@@ -48,7 +50,7 @@ CREATE TABLE "OrderItem" (
 );
 
 -- CreateTable
-CREATE TABLE "Feedback" (
+CREATE TABLE IF NOT EXISTS "Feedback" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "customerName" TEXT NOT NULL DEFAULT '',
     "rating" INTEGER NOT NULL,
@@ -56,6 +58,12 @@ CREATE TABLE "Feedback" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- CreateIndex
-CREATE UNIQUE INDEX "Category_slug_key" ON "Category"("slug");
+-- CreateTable (rate limit lintas-instance + denylist logout)
+CREATE TABLE IF NOT EXISTS "Guard" (
+    "key" TEXT NOT NULL PRIMARY KEY,
+    "count" INTEGER NOT NULL DEFAULT 0,
+    "resetAt" DATETIME
+);
 
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "Category_slug_key" ON "Category"("slug");

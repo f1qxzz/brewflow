@@ -2,33 +2,53 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Clock, CheckCircle2, XCircle, Coffee, TrendingUp, Trash2 } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, XCircle, Check, X, Coffee, TrendingUp, Trash2 } from "lucide-react";
 import { useAdminToken } from "../layout";
 import FadeUp from "@/components/FadeUp";
 
 const statusMeta: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   pending:   { label: "Menunggu", color: "bg-amber-50 text-amber-800 border-amber-200", icon: <Clock className="w-3 h-3" /> },
-  processed: { label: "Diproses", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <Coffee className="w-3 h-3" /> },
+  processed: { label: "Diproses", color: "bg-coffee-100 text-coffee-600 border-coffee-200", icon: <Coffee className="w-3 h-3" /> },
   done:      { label: "Selesai",  color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle2 className="w-3 h-3" /> },
   cancelled: { label: "Batal",    color: "bg-red-50 text-red-700 border-red-200",   icon: <XCircle className="w-3 h-3" /> },
 };
 
-const paymentMeta: Record<string, { label: string; color: string; icon: string }> = {
-  paid:    { label: "Lunas",        color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: "✓" },
-  unpaid:  { label: "Belum Bayar", color: "bg-amber-50 text-amber-800 border-amber-200",    icon: "⏳" },
-  expired: { label: "Expired",     color: "bg-red-50 text-red-700 border-red-200",         icon: "✗" },
-  failed:  { label: "Gagal",       color: "bg-red-50 text-red-700 border-red-200",         icon: "✗" },
+const paymentMeta: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  paid:    { label: "Lunas",        color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <Check className="w-3 h-3" /> },
+  unpaid:  { label: "Belum Bayar", color: "bg-amber-50 text-amber-800 border-amber-200",    icon: <Clock className="w-3 h-3" /> },
+  expired: { label: "Expired",     color: "bg-red-50 text-red-700 border-red-200",         icon: <X className="w-3 h-3" /> },
+  failed:  { label: "Gagal",       color: "bg-red-50 text-red-700 border-red-200",         icon: <X className="w-3 h-3" /> },
 };
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   qris: "QRIS", va_bca: "BCA VA", va_mandiri: "Mandiri VA", va_bni: "BNI VA", gopay: "GoPay", cash: "Tunai",
 };
 
+// tanggal + jam pesanan, zona lokal yang sama dengan filter omset harian
+function fmtDateTime(v: string | Date) {
+  const d = new Date(v);
+  return `${d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" })} ${d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+type AdminOrder = {
+  id: number;
+  status: string;
+  createdAt: string;
+  total?: number;
+  customerName?: string;
+  tableNumber?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  items?: { id?: number; quantity?: number; menuItem?: { name?: string } }[];
+};
+
 const beep = (() => {
   let ac: AudioContext | null = null;
   return () => {
     try {
-      ac ||= new (window.AudioContext || (window as any).webkitAudioContext)();
+      // ponytail: prefix webkit buat Safari lama
+      ac ||= new (window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       if (ac.state === "suspended") ac.resume();
       const t = ac.currentTime;
       const o = ac.createOscillator();
@@ -49,7 +69,7 @@ const beep = (() => {
 
 export default function OrdersPage() {
   const token = useAdminToken();
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [flash, setFlash] = useState(false);
 
   useEffect(() => {
@@ -59,10 +79,10 @@ export default function OrdersPage() {
 
     const load = () =>
       fetch("/api/orders", { headers: { "x-admin-token": token } })
-        .then((r) => r.json())
+        .then((r) => r.json() as Promise<AdminOrder[] | { error?: string }>)
         .then((data) => {
-          if (!alive || data.error) return;
-          const ids = new Set<number>(data.map((o: any) => o.id));
+          if (!alive || !Array.isArray(data)) return;
+          const ids = new Set<number>(data.map((o) => o.id));
           if (!first && [...ids].some((id) => !known.has(id))) {
             beep(); // pesanan baru masuk = bunyi + flash header
             setFlash(true);
@@ -108,7 +128,9 @@ export default function OrdersPage() {
   }
 
   const groups = ["pending", "processed", "done", "cancelled"];
-  const grouped = groups.map((s) => ({ status: s, orders: orders.filter((o) => o.status === s) }));
+  // terbaru dulu di tiap kelompok status
+  const sortedOrders = [...orders].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  const grouped = groups.map((s) => ({ status: s, orders: sortedOrders.filter((o) => o.status === s) }));
   const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0);
 
   return (
@@ -130,11 +152,11 @@ export default function OrdersPage() {
                 <TrendingUp className="w-4 h-4 text-coffee-500" />
               </div>
               <div className="flex-1">
-                <p className="text-xs text-coffee-800/60">Total Pesanan</p>
+                <p className="text-xs text-coffee-800/70">Total Pesanan</p>
                 <p className="text-lg font-bold text-coffee-950">{orders.length} pesanan</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-coffee-800/60">Revenue</p>
+                <p className="text-xs text-coffee-800/70">Revenue</p>
                 <p className="text-sm font-bold text-coffee-500 font-mono">Rp{totalRevenue.toLocaleString()}</p>
               </div>
             </div>
@@ -145,7 +167,7 @@ export default function OrdersPage() {
               <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-cream-100 border border-cream-200 flex items-center justify-center">
                 <Coffee className="w-6 h-6 text-coffee-800/30" />
               </div>
-              <p className="text-coffee-800/60 font-medium">Belum ada pesanan</p>
+              <p className="text-coffee-800/70 font-medium">Belum ada pesanan</p>
             </FadeUp>
           ) : (
             <div className="space-y-6">
@@ -156,11 +178,14 @@ export default function OrdersPage() {
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusMeta[g.status]?.color || ""}`}>
                         {statusMeta[g.status]?.icon} {statusMeta[g.status]?.label || g.status}
                       </span>
-                      <span className="text-xs text-coffee-800/55">({g.orders.length})</span>
+                      <span className="text-xs text-coffee-800/70">({g.orders.length})</span>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {g.orders.map((order: any) => {
+                    {/* items-start: card gak ikut stretch setinggi teman satu baris → gak ada kosong di bawah */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
+                      {g.orders.map((order) => {
                         const meta = statusMeta[order.status] || statusMeta.pending;
+                        const payMeta = order.paymentStatus ? paymentMeta[order.paymentStatus] : undefined;
+                        const methodLabel = order.paymentMethod ? PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod : "";
                         return (
                           <div key={order.id} className="bg-white rounded-none border border-cream-200 overflow-hidden hover:border-cream-300 transition-all group">
                             <div className="px-4 py-3 flex items-center justify-between border-b border-cream-200">
@@ -171,11 +196,11 @@ export default function OrdersPage() {
                                 </span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-coffee-800/50">
-                                  {new Date(order.createdAt).toLocaleString("id", { hour: "2-digit", minute: "2-digit" })}
+                                <span className="text-[10px] text-coffee-800/70 font-mono tabular-nums">
+                                  {fmtDateTime(order.createdAt)}
                                 </span>
                                 <button onClick={() => deleteOrder(order.id)}
-                                  className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-full bg-cream-100 text-red-400 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all">
+                                  className="w-6 h-6 rounded-full bg-cream-100 text-red-400 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all">
                                   <Trash2 className="w-3 h-3" />
                                 </button>
                               </div>
@@ -186,18 +211,18 @@ export default function OrdersPage() {
                               <span className="text-coffee-800/30">•</span>
                               <span>Meja {order.tableNumber || "-"}</span>
                               <span className="text-coffee-800/30">•</span>
-                              <span className="text-coffee-800/55">{PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}</span>
+                              <span className="text-coffee-800/70">{methodLabel}</span>
                               <span className="text-coffee-800/30">•</span>
-                              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${paymentMeta[order.paymentStatus]?.color || paymentMeta.unpaid.color}`}>
-                                {paymentMeta[order.paymentStatus]?.icon} {paymentMeta[order.paymentStatus]?.label || "Unknown"}
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${payMeta?.color || paymentMeta.unpaid.color}`}>
+                                {payMeta?.icon}{payMeta?.label || "Unknown"}
                               </span>
                             </div>
 
                             <div className="px-4 py-3 space-y-1.5">
-                              {order.items?.map((item: any) => (
+                              {order.items?.map((item) => (
                                 <div key={item.id} className="flex items-center justify-between text-sm">
                                   <span className="text-coffee-800/75 truncate">{item.menuItem?.name || "—"}</span>
-                                  <span className="text-coffee-800/55 text-xs shrink-0 ml-2">{item.quantity}x</span>
+                                  <span className="text-coffee-800/70 text-xs shrink-0 ml-2">{item.quantity}x</span>
                                 </div>
                               ))}
                             </div>
@@ -210,9 +235,10 @@ export default function OrdersPage() {
                                 {order.paymentStatus !== "paid" && (
                                   <button
                                     onClick={() => verifyPayment(order.id)}
-                                    className="px-3 py-1.5 bg-emerald-600 text-white text-[11px] rounded-none font-medium hover:bg-emerald-700 active:scale-95 transition-all"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] rounded-none font-medium hover:bg-emerald-700 active:scale-95 transition-all"
                                   >
-                                    ✓ {order.paymentMethod === "cash" ? "Bayar di Kasir" : "Verifikasi Bayar"}
+                                    <Check className="w-3 h-3" />
+                                    {order.paymentMethod === "cash" ? "Bayar di Kasir" : "Verifikasi Bayar"}
                                   </button>
                                 )}
                                 {order.status === "pending" && (

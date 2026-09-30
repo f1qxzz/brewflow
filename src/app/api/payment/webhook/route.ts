@@ -25,7 +25,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Payment gateway not configured" }, { status: 503 });
     }
 
-    let body: any;
+    // payload Midtrans: semua string; diparse manual, gak pernah di-trust apa adanya
+    let body: {
+      order_id?: string;
+      transaction_status?: string;
+      fraud_status?: string;
+      status_code?: string;
+      gross_amount?: string;
+      transaction_id?: string;
+      notification_id?: string;
+    };
     try {
       body = await req.json();
     } catch {
@@ -83,7 +92,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
     }
 
-    const paymentStatus = parsePaymentStatus(transaction_status, fraud_status);
+    const paymentStatus = parsePaymentStatus(transaction_status, fraud_status ?? "");
     if (order.paymentStatus === "paid" && paymentStatus !== "paid") {
       return NextResponse.json({ ok: true, alreadyPaid: true });
     }

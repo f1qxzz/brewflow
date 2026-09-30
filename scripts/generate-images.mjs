@@ -20,7 +20,7 @@ const palettes = {
 
 const items = await prisma.menuItem.findMany({ include: { category: true } });
 const catOrder = {};
-items.forEach((item, i) => {
+items.forEach((item) => {
   if (!catOrder[item.category.name]) catOrder[item.category.name] = [];
   catOrder[item.category.name].push(item);
 });

@@ -115,8 +115,8 @@ async function downloadImage(img: ImageDef): Promise<void> {
     const buf = await res.arrayBuffer();
     writeFileSync(filePath, Buffer.from(buf));
     console.log(`  ✅ ${img.name} (${(buf.byteLength / 1024).toFixed(0)}KB)`);
-  } catch (e: any) {
-    console.log(`  ❌ ${img.name}: ${e.message}`);
+  } catch (e) {
+    console.log(`  ❌ ${img.name}: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 

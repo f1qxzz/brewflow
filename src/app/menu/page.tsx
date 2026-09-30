@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import Image from "next/image";
 import { ShoppingBag, Coffee, CheckCircle2, AlertCircle } from "lucide-react";
-import type { MenuItem, CartItem } from "@/types";
+import type { MenuItem, CartItem, Category, ConfirmedOrder } from "@/types";
 import type { PaymentMethod } from "@/lib/payment";
 import MenuHeader from "@/components/MenuHeader";
 import CategoryTabs from "@/components/CategoryTabs";
@@ -21,26 +21,31 @@ const Skeleton = () => (
   </div>
 );
 
+// GET /api/orders?table=N → kartu riwayat pesanan aktif per meja
+type TableOrder = { id: number; status: string; total: number; createdAt: string };
+
 export default function MenuPage() {
-  const [menu, setMenu] = useState<any[]>([]);
+  const [menu, setMenu] = useState<Category[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeCat, setActiveCat] = useState(0);
   const [showCart, setShowCart] = useState(false);
   const [name, setName] = useState("");
   const [table, setTable] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [lastOrder, setLastOrder] = useState<any>(null);
+  const [lastOrder, setLastOrder] = useState<ConfirmedOrder | null>(null);
   const [rating, setRating] = useState(5);
   const [feedback, setFeedback] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [page, setPage] = useState(0);
-  const [featured, setFeatured] = useState<any>(null);
-  const [tableOrders, setTableOrders] = useState<any[]>([]);
+  const [featured, setFeatured] = useState<MenuItem | null>(null);
+  const [tableOrders, setTableOrders] = useState<TableOrder[]>([]);
   const [tableOrdersLoaded, setTableOrdersLoaded] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [tableLocked, setTableLocked] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
 
   const showToast = useCallback((type: "success" | "error", msg: string) => {
     setToast({ type, msg });
@@ -48,24 +53,29 @@ export default function MenuPage() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const t = params.get("table");
-    if (t) {
-      setTable(t);
-      setTableLocked(true);
-      fetch("/api/orders?table=" + encodeURIComponent(t))
-        .then((r) => r.json())
-        .then((data) => setTableOrders(data))
-        .finally(() => setTableOrdersLoaded(true));
-    } else {
-      setTableOrdersLoaded(true);
-    }
+    // ponytail: init ?table= dijalankan di async IIFE (bukan sync di body effect) biar
+    // gak cascade render; efeknya sama — jalan pas mount, sebelum user sempat ngetik
+    (async () => {
+      const t = new URLSearchParams(window.location.search).get("table");
+      if (!t) {
+        setTableOrdersLoaded(true);
+      } else {
+        setTable(t);
+        setTableLocked(true);
+        try {
+          const r = await fetch("/api/orders?table=" + encodeURIComponent(t));
+          setTableOrders(await r.json());
+        } finally {
+          setTableOrdersLoaded(true);
+        }
+      }
+    })();
 
     fetch("/api/menu")
       .then((r) => { if (!r.ok) throw new Error("Gagal muat menu"); return r.json(); })
-      .then((data) => {
+      .then((data: Category[]) => {
         setMenu(data);
-        const all = data.flatMap((c: any) => c.items || []);
+        const all = data.flatMap((c) => c.items || []);
         if (all.length > 0) setFeatured(all[Math.floor(Math.random() * all.length)]);
       })
       .catch((e) => setError(e.message))
@@ -78,7 +88,7 @@ export default function MenuPage() {
         if (!raw) return;
         const stored = JSON.parse(raw);
         if (!stored?.id) return localStorage.removeItem("brewflow:pendingOrder");
-        const r = await fetch(`/api/payment/${stored.id}`);
+        const r = await fetch(`/api/payment/${stored.id}?t=${encodeURIComponent(stored.orderToken || "")}`);
         const data = r.ok ? await r.json() : null;
         if (data && data.paymentStatus !== "paid" && data.status !== "cancelled") {
           setLastOrder({ ...stored, paymentStatus: data.paymentStatus, status: data.status });
@@ -111,6 +121,10 @@ export default function MenuPage() {
   }
 
   async function submitOrder(method: PaymentMethod = "cash") {
+    // ponytail: lock sinkron — klik 2x sebelum re-render tetap cuma bikin 1 order
+    if (submitLock.current) return;
+    submitLock.current = true;
+    setSubmitting(true);
     try {
       const items = cart.map((i) => ({ id: i.id, quantity: i.qty }));
       const res = await fetch("/api/orders", {
@@ -136,6 +150,9 @@ export default function MenuPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Gagal kirim pesanan. Coba lagi.";
       showToast("error", msg);
+    } finally {
+      submitLock.current = false;
+      setSubmitting(false);
     }
   }
 
@@ -215,7 +232,7 @@ export default function MenuPage() {
                     className="text-center py-20"
                   >
                     <div className="w-12 h-12 mx-auto mb-4 rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center">
-                      <ShoppingBag className="w-5 h-5 text-coffee-800/40" />
+                      <ShoppingBag className="w-5 h-5 text-coffee-800/70" />
                     </div>
                     <p className="text-coffee-950 font-medium text-sm">{error}</p>
                     <button
@@ -240,12 +257,12 @@ export default function MenuPage() {
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-coffee-950">Meja {table}</span>
                                 {tableOrders.length > 0 && (
-                                  <span className="text-[10px] text-coffee-800/55">
+                                  <span className="text-[10px] text-coffee-800/70">
                                     {tableOrders.length} pesanan aktif
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs text-coffee-800/50 mt-0.5">
+                              <p className="text-xs text-coffee-800/70 mt-0.5">
                                 {tableOrders.length > 0 ? "Pesanan baru akan ditambahkan" : "Siap pesan"}
                               </p>
                             </div>
@@ -267,14 +284,14 @@ export default function MenuPage() {
                               <Image src={featured.image} alt={featured.name} fill className="object-cover" sizes="48px" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Coffee className="w-5 h-5 text-coffee-800/40" />
+                                <Coffee className="w-5 h-5 text-coffee-800/70" />
                               </div>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <span className="text-[10px] text-coffee-500 uppercase tracking-wider">Rekomendasi</span>
                             <h3 className="text-sm font-medium text-coffee-950 truncate">{featured.name}</h3>
-                            <p className="text-xs text-coffee-800/50 mt-0.5 line-clamp-1">{featured.description}</p>
+                            <p className="text-xs text-coffee-800/70 mt-0.5 line-clamp-1">{featured.description}</p>
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-sm text-coffee-800 font-mono">Rp{featured.price.toLocaleString("id")}</p>
@@ -294,7 +311,7 @@ export default function MenuPage() {
                     </div>
 
                     <div className="mt-6 mb-3 flex items-center justify-between">
-                      <p className="text-xs text-coffee-800/50">
+                      <p className="text-xs text-coffee-800/70">
                         {cat?.items.length || 0} item
                         {totalPages > 1 && ` · halaman ${page + 1}/${totalPages}`}
                       </p>
@@ -327,7 +344,7 @@ export default function MenuPage() {
                         <button
                           onClick={() => setPage(Math.max(0, page - 1))}
                           disabled={page === 0}
-                          className="w-9 h-9 min-h-[36px] rounded-none text-xs text-coffee-800/60 hover:text-coffee-950 hover:bg-cream-100 transition-all disabled:opacity-20 disabled:pointer-events-none"
+                          className="h-11 min-w-11 rounded-none text-xs text-coffee-800/70 hover:text-coffee-950 hover:bg-cream-100 transition-colors disabled:opacity-40 disabled:pointer-events-none"
                         >
                           ←
                         </button>
@@ -335,10 +352,10 @@ export default function MenuPage() {
                           <button
                             key={i}
                             onClick={() => setPage(i)}
-                            className={`w-9 h-9 min-h-[36px] rounded-none text-xs font-medium transition-all ${
+                            className={`h-11 min-w-11 rounded-none text-xs font-medium transition-colors ${
                               i === page
                                 ? "bg-coffee-500 text-white"
-                                : "text-coffee-800/60 hover:text-coffee-950 hover:bg-cream-100"
+                                : "text-coffee-800/70 hover:text-coffee-950 hover:bg-cream-100"
                             }`}
                           >
                             {i + 1}
@@ -347,7 +364,7 @@ export default function MenuPage() {
                         <button
                           onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                           disabled={page >= totalPages - 1}
-                          className="w-9 h-9 min-h-[36px] rounded-none text-xs text-coffee-800/60 hover:text-coffee-950 hover:bg-cream-100 transition-all disabled:opacity-20 disabled:pointer-events-none"
+                          className="h-11 min-w-11 rounded-none text-xs text-coffee-800/70 hover:text-coffee-950 hover:bg-cream-100 transition-colors disabled:opacity-40 disabled:pointer-events-none"
                         >
                           →
                         </button>
@@ -367,6 +384,7 @@ export default function MenuPage() {
                       tableLocked={tableLocked}
                       total={total}
                       onSubmit={submitOrder}
+                      submitting={submitting}
                       onPaymentMethodChange={setPaymentMethod}
                       paymentMethod={paymentMethod}
                     />

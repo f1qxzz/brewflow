@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, parseId } from "@/lib/admin-auth";
 
 export async function POST(req: Request, { params }: { params: Promise<{ orderId: string }> }) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   const { orderId } = await params;

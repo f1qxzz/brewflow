@@ -1,21 +1,61 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, QrCode, Copy, ExternalLink, Download, LayoutGrid, X } from "lucide-react";
+import NextImage from "next/image";
+import { ArrowLeft, QrCode, Copy, ExternalLink, Download, LayoutGrid, X, CheckCircle2 } from "lucide-react";
 import QRCode from "qrcode";
 import FadeUp from "@/components/FadeUp";
 
+const TABLES = Array.from({ length: 10 }, (_, i) => i + 1);
+
+/* ponytail: origin = external store (window.location.origin) → useSyncExternalStore.
+   Bukan setState di effect, dan getServerSnapshot "" biar hydrate gak beda sama SSR.
+   Semua konsumen (download/copy/render) di-gate sama `origin`/`cards` — gak ada QR
+   relatif atau QR dari renderer lain yang kesimpan. */
+const subscribeOrigin = () => () => {};
+const readOrigin = () => (typeof window === "undefined" ? "" : window.location.origin);
+
+function menuUrl(origin: string, table: number) {
+  return `${origin}/menu?table=${table}`;
+}
+
+async function makeCard(origin: string, t: number): Promise<string> {
+  const qrData = await QRCode.toDataURL(menuUrl(origin, t), { margin: 1, width: 540, color: { dark: "#0A0A0A", light: "#FFFFFF" } });
+  const img = new Image();
+  await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; img.src = qrData; });
+  const c = document.createElement("canvas");
+  c.width = 720;
+  c.height = 1000;
+  const x = c.getContext("2d")!;
+  x.fillStyle = "#FFFFFF";
+  x.fillRect(0, 0, 720, 1000);
+  x.strokeStyle = "#0A0A0A";
+  x.lineWidth = 5;
+  x.strokeRect(14, 14, 692, 972);
+  x.textAlign = "center";
+  x.fillStyle = "#6B5340";
+  x.font = "700 34px Archivo, sans-serif";
+  x.fillText("BREWFLOW", 360, 88);
+  x.fillStyle = "#0A0A0A";
+  x.font = "800 104px Archivo, sans-serif";
+  x.fillText(`MEJA ${t}`, 360, 205);
+  x.drawImage(img, 90, 250, 540, 540);
+  x.fillStyle = "#0A0A0A";
+  x.font = "600 32px Archivo, sans-serif";
+  x.fillText("Scan untuk lihat menu & pesan", 360, 862);
+  x.fillStyle = "#666666";
+  x.font = "400 24px Archivo, sans-serif";
+  x.fillText("Meja kamu terisi otomatis", 360, 906);
+  return c.toDataURL("image/png");
+}
+
 export default function QRPage() {
-  const [origin, setOrigin] = useState("");
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [cards, setCards] = useState<Record<number, string>>({});
   const [copiedUrl, setCopiedUrl] = useState(false);
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+  const origin = useSyncExternalStore(subscribeOrigin, readOrigin, () => "");
 
   useEffect(() => {
     if (!origin) return;
@@ -23,62 +63,25 @@ export default function QRPage() {
     (async () => {
       await document.fonts.ready;
       const out: Record<number, string> = {};
-      for (const t of tables) out[t] = await makeCard(t);
+      for (const t of TABLES) out[t] = await makeCard(origin, t);
       if (alive) setCards(out);
     })();
     return () => { alive = false; };
   }, [origin]);
 
-  const tables = Array.from({ length: 10 }, (_, i) => i + 1);
-
-  function menuUrl(table: number) {
-    return `${origin}/menu?table=${table}`;
-  }
-
-  function qrUrl(table: number) {
-    const data = encodeURIComponent(menuUrl(table));
-    return `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${data}`;
-  }
-
   function downloadQR(table: number) {
+    const data = cards[table];
+    // ponytail: gambar belum siap → batal, jangan jatuh ke QR renderer lain
+    if (!data) return;
     const a = document.createElement("a");
-    a.href = cards[table] ?? qrUrl(table);
+    a.href = data;
     a.download = `brewflow-meja-${table}.png`;
     a.click();
   }
 
-  async function makeCard(t: number): Promise<string> {
-    const qrData = await QRCode.toDataURL(menuUrl(t), { margin: 1, width: 540, color: { dark: "#0A0A0A", light: "#FFFFFF" } });
-    const img = new Image();
-    await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; img.src = qrData; });
-    const c = document.createElement("canvas");
-    c.width = 720;
-    c.height = 1000;
-    const x = c.getContext("2d")!;
-    x.fillStyle = "#FFFFFF";
-    x.fillRect(0, 0, 720, 1000);
-    x.strokeStyle = "#0A0A0A";
-    x.lineWidth = 5;
-    x.strokeRect(14, 14, 692, 972);
-    x.textAlign = "center";
-    x.fillStyle = "#D33A0A";
-    x.font = "700 34px Archivo, sans-serif";
-    x.fillText("BREWFLOW", 360, 88);
-    x.fillStyle = "#0A0A0A";
-    x.font = "800 104px Archivo, sans-serif";
-    x.fillText(`MEJA ${t}`, 360, 205);
-    x.drawImage(img, 90, 250, 540, 540);
-    x.fillStyle = "#0A0A0A";
-    x.font = "600 32px Archivo, sans-serif";
-    x.fillText("Scan untuk lihat menu & pesan", 360, 862);
-    x.fillStyle = "#666666";
-    x.font = "400 24px Archivo, sans-serif";
-    x.fillText("Meja kamu terisi otomatis", 360, 906);
-    return c.toDataURL("image/png");
-  }
-
   function copyLink(table: number) {
-    navigator.clipboard.writeText(menuUrl(table));
+    if (!origin) return;
+    navigator.clipboard.writeText(menuUrl(origin, table));
   }
 
   return (
@@ -93,7 +96,8 @@ export default function QRPage() {
           </div>
         </header>
 
-        <main className="max-w-4xl mx-auto px-4 py-5">
+        {/* isi cuma ~530px: taruh di tengah biar bawah gak kosong melompong */}
+        <main className="max-w-4xl mx-auto px-4 py-5 min-h-[calc(100dvh-3.5rem)] flex flex-col justify-center">
           <FadeUp className="bg-white rounded-none border border-cream-200 p-5 md:p-6">
             {!showAll && (
               <>
@@ -103,12 +107,12 @@ export default function QRPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-coffee-950">Pilih Meja</p>
-                    <p className="text-xs text-coffee-800/60">Mau bikin QR untuk meja berapa?</p>
+                    <p className="text-xs text-coffee-800/70">Mau bikin QR untuk meja berapa?</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-5 md:grid-cols-10 gap-2 mb-5">
-                  {tables.map((t) => (
+                  {TABLES.map((t) => (
                     <button
                       key={t}
                       onClick={() => setSelectedTable(t === selectedTable ? null : t)}
@@ -125,7 +129,7 @@ export default function QRPage() {
 
                 <button
                   onClick={() => setShowAll(true)}
-                  className="w-full py-2.5 rounded-none border border-dashed border-cream-300 text-sm text-coffee-800/60 hover:text-coffee-500 hover:border-coffee-300 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-none border border-dashed border-cream-300 text-sm text-coffee-800/70 hover:text-coffee-500 hover:border-coffee-300 transition-all flex items-center justify-center gap-2"
                 >
                   <LayoutGrid className="w-4 h-4" /> Lihat Semua QR (Print All)
                 </button>
@@ -136,11 +140,17 @@ export default function QRPage() {
               <FadeUp className="pt-5 border-t border-cream-200">
                 <div className="flex flex-col md:flex-row items-center gap-6">
                   <div className="bg-white rounded-none p-3 border border-cream-200 shadow-sm shrink-0">
-                    <img src={cards[selectedTable] ?? qrUrl(selectedTable)} alt="QR Code" className="w-40 md:w-52 h-auto" />
+                    {cards[selectedTable] ? (
+                      <NextImage src={cards[selectedTable]} alt="QR Code" width={416} height={416} className="w-40 md:w-52 h-auto" />
+                    ) : (
+                      <div className="w-40 md:w-52 h-40 md:h-52 grid place-items-center bg-cream-50 text-xs text-coffee-800/60 border border-dashed border-cream-300">
+                        Bikin QR…
+                      </div>
+                    )}
                   </div>
                   <div className="text-center md:text-left">
                     <p className="text-lg font-bold text-coffee-950">Meja {selectedTable}</p>
-                    <p className="text-xs text-coffee-800/60 mt-1">Scan QR → buka menu → pesan — meja {selectedTable} otomatis terisi</p>
+                    <p className="text-xs text-coffee-800/70 mt-1">Scan QR → buka menu → pesan — meja {selectedTable} otomatis terisi</p>
                     <div className="flex flex-wrap gap-2 mt-4 justify-center md:justify-start">
                       <button onClick={() => downloadQR(selectedTable)}
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-none bg-coffee-500 text-white text-sm font-medium hover:bg-coffee-600 active:scale-95 transition-all">
@@ -150,7 +160,7 @@ export default function QRPage() {
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-none bg-cream-100 border border-cream-200 text-coffee-950 text-sm hover:bg-cream-200 active:scale-95 transition-all">
                         <Copy className="w-3.5 h-3.5" /> Copy Link
                       </button>
-                      <a href={menuUrl(selectedTable)} target="_blank"
+                      <a href={menuUrl(origin, selectedTable)} target="_blank"
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-none bg-cream-100 border border-cream-200 text-coffee-950 text-sm hover:bg-cream-200 active:scale-95 transition-all">
                         <ExternalLink className="w-3.5 h-3.5" /> Buka Menu
                       </a>
@@ -163,7 +173,7 @@ export default function QRPage() {
             {!selectedTable && !showAll && (
               <div className="text-center py-8 border-t border-cream-200">
                 <QrCode className="w-10 h-10 mx-auto mb-2 text-coffee-800/25" />
-                <p className="text-sm text-coffee-800/50">Pilih nomor meja dulu</p>
+                <p className="text-sm text-coffee-800/70">Pilih nomor meja dulu</p>
               </div>
             )}
 
@@ -172,7 +182,7 @@ export default function QRPage() {
                 <div className="flex items-center justify-between mb-5">
                   <div>
                     <p className="font-semibold text-coffee-950">Semua QR Meja</p>
-                    <p className="text-xs text-coffee-800/60 mt-1">Download semua QR, print, tempel di meja masing-masing</p>
+                    <p className="text-xs text-coffee-800/70 mt-1">Download semua QR, print, tempel di meja masing-masing</p>
                   </div>
                   <button onClick={() => setShowAll(false)}
                     className="w-8 h-8 rounded-full bg-cream-100 border border-cream-200 flex items-center justify-center hover:bg-cream-200 transition-colors">
@@ -181,10 +191,16 @@ export default function QRPage() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  {tables.map((t) => (
+                  {TABLES.map((t) => (
                     <div key={t} className="bg-cream-50 rounded-none border border-cream-200 p-3 text-center">
                       <div className="bg-white rounded-none p-2 mb-2 border border-cream-200">
-                        <img src={cards[t] ?? qrUrl(t)} alt={`Meja ${t}`} className="w-full h-auto" />
+                        {cards[t] ? (
+                          <NextImage src={cards[t]} alt={`Meja ${t}`} width={400} height={400} className="w-full h-auto" />
+                        ) : (
+                          <div className="w-full aspect-square grid place-items-center bg-cream-50 text-[11px] text-coffee-800/60 border border-dashed border-cream-300">
+                            Bikin QR…
+                          </div>
+                        )}
                       </div>
                       <p className="text-sm font-bold text-coffee-950">Meja {t}</p>
                       <div className="flex gap-1 mt-2 justify-center">
@@ -194,7 +210,7 @@ export default function QRPage() {
                         </button>
                         <button onClick={() => copyLink(t)}
                           className="w-7 h-7 rounded-none bg-cream-100 border border-cream-200 flex items-center justify-center hover:bg-cream-200 transition-colors">
-                          <Copy className="w-3 h-3 text-coffee-800/60" />
+                          <Copy className="w-3 h-3 text-coffee-800/70" />
                         </button>
                       </div>
                     </div>
@@ -204,14 +220,16 @@ export default function QRPage() {
             )}
           </FadeUp>
 
-          <FadeUp delay={0.08} className="mt-4 bg-white rounded-none border border-cream-200 grid grid-cols-3 divide-x divide-cream-200 text-center">
-            <div className="px-3 py-4">
-              <p className="text-lg font-bold text-coffee-950">{tables.length}</p>
-              <p className="text-[11px] text-coffee-800/60 mt-0.5">QR Meja</p>
+          <FadeUp delay={0.08} className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="rounded-none bg-white border border-cream-200 p-4">
+              <span className="text-[11px] text-coffee-800/70 block mb-1.5">Total QR Meja</span>
+              <p className="text-lg md:text-xl font-semibold font-mono text-coffee-950">{TABLES.length}</p>
+              <p className="text-[11px] text-coffee-800/70 mt-0.5">Meja 1 sampai {TABLES.length}</p>
             </div>
-            <div className="px-3 py-4">
-              <p className="text-lg font-bold text-coffee-950">720×1000</p>
-              <p className="text-[11px] text-coffee-800/60 mt-0.5">PNG siap print</p>
+            <div className="rounded-none bg-white border border-cream-200 p-4">
+              <span className="text-[11px] text-coffee-800/70 block mb-1.5">Ukuran PNG</span>
+              <p className="text-lg md:text-xl font-semibold font-mono text-coffee-950">720×1000</p>
+              <p className="text-[11px] text-coffee-800/70 mt-0.5">Rasio 0.72 · siap print</p>
             </div>
             <button
               onClick={() => {
@@ -220,13 +238,25 @@ export default function QRPage() {
                 setCopiedUrl(true);
                 setTimeout(() => setCopiedUrl(false), 2000);
               }}
-              className="px-3 py-4 hover:bg-cream-50 transition-colors"
-              title="Copy URL publik"
+              disabled={!origin}
+              title="Salin URL publik"
+              className="col-span-2 md:col-span-1 rounded-none bg-white border border-cream-200 p-4 text-left hover:border-coffee-300 hover:bg-cream-50 transition-colors disabled:opacity-60"
             >
-              <p className="text-sm font-bold text-coffee-950 truncate max-w-[26ch] mx-auto">
-                {copiedUrl ? "Tersalin!" : origin ? origin.replace(/^https?:\/\//, "") : "…"}
+              <span className="text-[11px] text-coffee-800/70 block mb-1.5 flex items-center gap-1.5">
+                {copiedUrl ? (
+                  <span className="text-emerald-600 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Tersalin
+                  </span>
+                ) : (
+                  "URL publik"
+                )}
+              </span>
+              <p className="text-lg md:text-xl font-semibold font-mono text-coffee-950 truncate max-w-[24ch]">
+                {origin ? origin.replace(/^https?:\/\//, "") : "…"}
               </p>
-              <p className="text-[11px] text-coffee-800/60 mt-0.5">{copiedUrl ? "URL publik" : "Klik untuk copy URL"}</p>
+              <p className="text-[11px] text-coffee-800/70 mt-0.5">
+                {copiedUrl ? "Tempel di mana saja" : "Klik untuk salin link"}
+              </p>
             </button>
           </FadeUp>
         </main>

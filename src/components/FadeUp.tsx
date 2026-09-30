@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 
 export default function FadeUp({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
   const reduce = useReducedMotion();
-  if (!mounted || reduce) return <div className={className}>{children}</div>;
+  if (reduce) return <div className={className}>{children}</div>;
   return (
     <motion.div
       className={className}

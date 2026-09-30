@@ -26,7 +26,7 @@ export default function CategoryTabs({
             className={`shrink-0 snap-start px-3.5 py-2.5 text-sm font-medium transition-all duration-200 relative ${
               i === active
                 ? "text-coffee-950"
-                : "text-coffee-800/50 hover:text-coffee-800"
+                : "text-coffee-800/70 hover:text-coffee-800"
             }`}
           >
             {c.name}

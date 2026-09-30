@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, parseId } from "@/lib/admin-auth";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   const { id } = await params;
@@ -26,7 +26,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   const { id } = await params;

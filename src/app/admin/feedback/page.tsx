@@ -6,14 +6,22 @@ import { ArrowLeft, MessageSquareText, Star, TrendingUp, Trash2 } from "lucide-r
 import { useAdminToken } from "../layout";
 import FadeUp from "@/components/FadeUp";
 
+type FeedbackRow = {
+  id: number;
+  rating: number;
+  createdAt: string;
+  customerName?: string;
+  message?: string;
+};
+
 export default function FeedbackPage() {
   const token = useAdminToken();
-  const [feedback, setFeedback] = useState<any[]>([]);
+  const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
 
   useEffect(() => {
     fetch("/api/feedback", { headers: { "x-admin-token": token } })
-      .then((r) => r.json())
-      .then((data) => { if (!data.error) setFeedback(data); });
+      .then((r) => r.json() as Promise<FeedbackRow[] | { error?: string }>)
+      .then((data) => { if (Array.isArray(data)) setFeedback(data); });
   }, [token]);
 
   async function deleteFeedback(id: number) {
@@ -45,11 +53,11 @@ export default function FeedbackPage() {
                 <TrendingUp className="w-4 h-4 text-emerald-600" />
               </div>
               <div className="flex-1">
-                <p className="text-xs text-coffee-800/60">Total Feedback</p>
+                <p className="text-xs text-coffee-800/70">Total Feedback</p>
                 <p className="text-lg font-bold text-coffee-950">{feedback.length}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-coffee-800/60">Rata-rata</p>
+                <p className="text-xs text-coffee-800/70">Rata-rata</p>
                 <div className="flex items-center gap-1">
                   <Star className="w-3.5 h-3.5 fill-coffee-500 text-coffee-500" />
                   <span className="text-sm font-bold text-coffee-950">{avgRating}</span>
@@ -63,17 +71,17 @@ export default function FeedbackPage() {
               <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-cream-100 border border-cream-200 flex items-center justify-center">
                 <MessageSquareText className="w-6 h-6 text-coffee-800/30" />
               </div>
-              <p className="text-coffee-800/60 font-medium">Belum ada feedback</p>
+              <p className="text-coffee-800/70 font-medium">Belum ada feedback</p>
             </FadeUp>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {feedback.map((f: any, i: number) => (
+              {feedback.map((f, i) => (
                 <FadeUp key={f.id} delay={Math.min(i, 6) * 0.04}>
                 <div className="h-full bg-white rounded-none p-4 border border-cream-200 hover:border-cream-300 transition-all group">
                   <div className="flex items-start justify-between mb-1">
                     <span className="font-medium text-coffee-950 text-sm">{f.customerName || "Anonim"}</span>
                     <button onClick={() => deleteFeedback(f.id)}
-                      className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-cream-100 text-red-400 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all shrink-0">
+                      className="w-7 h-7 rounded-full bg-cream-100 text-red-400 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all shrink-0">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -83,7 +91,7 @@ export default function FeedbackPage() {
                     ))}
                   </div>
                   {f.message && <p className="text-sm text-coffee-800/65 mt-1.5">{f.message}</p>}
-                  <p className="text-[10px] text-coffee-800/45 mt-3">{new Date(f.createdAt).toLocaleString("id")}</p>
+                  <p className="text-[10px] text-coffee-800/70 mt-3">{new Date(f.createdAt).toLocaleString("id")}</p>
                 </div>
                 </FadeUp>
               ))}

@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   const rl = rateLimitKey("fb:" + clientKey(req), 10, 60_000);
   if (rl) return rl;
 
-  let body: any;
+  let body: { rating?: unknown; customerName?: unknown; message?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   const feedback = await prisma.feedback.findMany({ orderBy: { createdAt: "desc" } });
