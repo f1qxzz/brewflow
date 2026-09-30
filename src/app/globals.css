@@ -141,13 +141,6 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 }
 .cart-bounce { animation: cart-bounce 0.3s var(--ease-out-expo); }
 
-/* ----- Landing: gambar hero nembus ke tepi kanan viewport (putus simetri hero) ----- */
-@media (min-width: 768px) {
-  .bleed-right {
-    margin-right: calc(-1 * (max(0px, (100vw - 72rem) / 2) + 2rem));
-  }
-}
-
 /* ----- Mode gelap: pengecualian per-role -----
    coffee-500/600 gak bisa di-flip penuh karena dipakai juga sbg bg tombol
    (butuh teks putih = gelap). Jadi bg-nya digeser doang lewat .dark di atas,
