@@ -85,7 +85,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-coffee-800/70" />
               <input
                 type="password"
-                inputMode="numeric"
                 value={pin}
                 onChange={(e) => { setPin(e.target.value); setError(""); }}
                 placeholder="Masukkan PIN"
