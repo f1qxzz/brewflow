@@ -11,9 +11,19 @@ export async function POST(req: Request) {
   const auth = await requireAdmin(req);
   if (auth) return auth;
 
-  const body = await req.json();
-  const cat = await prisma.category.create({
-    data: { name: body.name, slug: body.slug, order: body.order ?? 0 },
-  });
-  return NextResponse.json(cat, { status: 201 });
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  const name = String(body?.name ?? "").trim().slice(0, 100);
+  const slug = String(body?.slug ?? "").trim().slice(0, 100);
+  if (!name || !slug) return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
+
+  try {
+    const cat = await prisma.category.create({
+      data: { name, slug, order: Math.trunc(Number(body?.order)) || 0 },
+    });
+    return NextResponse.json(cat, { status: 201 });
+  } catch (e) {
+    if (String((e as { code?: string })?.code ?? "").startsWith("P2"))
+      return NextResponse.json({ error: "Slug sudah dipakai" }, { status: 400 });
+    throw e;
+  }
 }

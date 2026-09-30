@@ -27,17 +27,29 @@ export async function POST(req: Request) {
   const auth = await requireAdmin(req);
   if (auth) return auth;
 
-  const body = await req.json();
-  const item = await prisma.menuItem.create({
-    data: {
-      name: body.name,
-      description: body.description || "",
-      price: body.price,
-      image: body.image || "",
-      categoryId: body.categoryId,
-      available: body.available ?? true,
-      order: body.order ?? 0,
-    },
-  });
-  return NextResponse.json(item, { status: 201 });
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  const name = String(body?.name ?? "").trim().slice(0, 100);
+  const price = Math.trunc(Number(body?.price));
+  const categoryId = Math.trunc(Number(body?.categoryId));
+  if (!name || !Number.isFinite(price) || price < 0 || !Number.isFinite(categoryId) || categoryId < 1)
+    return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
+
+  try {
+    const item = await prisma.menuItem.create({
+      data: {
+        name,
+        description: String(body?.description ?? "").slice(0, 500),
+        price,
+        image: String(body?.image ?? "").slice(0, 500),
+        categoryId,
+        available: body?.available !== false,
+        order: Math.trunc(Number(body?.order)) || 0,
+      },
+    });
+    return NextResponse.json(item, { status: 201 });
+  } catch (e) {
+    if (String((e as { code?: string })?.code ?? "").startsWith("P2"))
+      return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
+    throw e;
+  }
 }
